@@ -14,6 +14,13 @@ kotlin = "2.3.20"
 ksp = "2.3.9"
 detekt = "1.23.8"
 composeRules = "0.5.9"
+decompose = "3.5.0"
+mvikotlin = "4.4.0"
+metro = "1.1.1"
+room = "2.8.4"
+datastore = "1.2.1"
+kotlinxDatetime = "0.6.2"
+turbine = "1.2.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -34,6 +41,30 @@ androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core",
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
 junit = { module = "junit:junit", version.ref = "junit" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
+
+# Decompose — navigation/component lifecycle library
+decompose = { module = "com.arkivanov.decompose:decompose", version.ref = "decompose" }
+decompose-extensions-compose = { module = "com.arkivanov.decompose:extensions-compose", version.ref = "decompose" }
+
+# MVIKotlin — MVI store implementation
+mvikotlin = { module = "com.arkivanov.mvikotlin:mvikotlin", version.ref = "mvikotlin" }
+mvikotlin-main = { module = "com.arkivanov.mvikotlin:mvikotlin-main", version.ref = "mvikotlin" }
+mvikotlin-extensions-coroutines = { module = "com.arkivanov.mvikotlin:mvikotlin-extensions-coroutines", version.ref = "mvikotlin" }
+
+# Metro — DI via KSP
+metro-runtime = { module = "dev.zacsweers.metro:runtime", version.ref = "metro" }
+
+# Room — local database
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+
+# DataStore — preferences storage
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+
+# Turbine — Flow testing utility (wired into test source sets in epic 7)
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 
 # Gradle plugin artifacts consumed by build-logic convention plugins (compileOnly / implementation on the build classpath, not app deps).
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "androidGradlePlugin" }
@@ -52,3 +83,6 @@ compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
+# GPP applied in epic 8 (#55); entry here for version-catalog completeness
+gradle-play-publisher = { id = "com.github.triplet.play", version = "4.0.0" }
