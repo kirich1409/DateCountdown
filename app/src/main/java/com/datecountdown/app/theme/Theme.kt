@@ -1,4 +1,4 @@
-package com.example.datecountdown.theme
+package com.datecountdown.app.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
