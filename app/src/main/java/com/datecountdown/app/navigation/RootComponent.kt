@@ -10,8 +10,10 @@ import com.arkivanov.decompose.router.stack.ChildStack
 import com.arkivanov.decompose.router.stack.StackNavigation
 import com.arkivanov.decompose.router.stack.childStack
 import com.arkivanov.decompose.router.stack.pop
-import com.arkivanov.decompose.router.stack.pushNew
+import com.arkivanov.decompose.router.stack.pushToFront
+import com.arkivanov.decompose.value.ObserveLifecycleMode
 import com.arkivanov.decompose.value.Value
+import com.arkivanov.decompose.value.subscribe
 import com.arkivanov.essenty.backhandler.BackCallback
 import com.datecountdown.app.feature.counter.CounterComponent
 import com.datecountdown.app.feature.counter.DefaultCounterComponent
@@ -96,8 +98,8 @@ class RootComponent(
 
   init {
     backHandler.register(backCallback)
-    editSlot.subscribe { updateBackCallback() }
-    stack.subscribe { updateBackCallback() }
+    editSlot.subscribe(lifecycle, ObserveLifecycleMode.CREATE_DESTROY) { updateBackCallback() }
+    stack.subscribe(lifecycle, ObserveLifecycleMode.CREATE_DESTROY) { updateBackCallback() }
     updateBackCallback()
   }
 
@@ -115,9 +117,15 @@ class RootComponent(
 
   // ── Public navigation API (called from feature Output translators below) ───────────────────────
 
-  /** Push the counter screen for [eventId] on the back stack (AC-NAV-1). */
+  /**
+   * Navigate to the counter screen for [eventId] (AC-NAV-1).
+   *
+   * If [Config.Counter] with this id is already in the stack it is brought to front rather than
+   * pushed again, so list-tap and deep-link (AC-NAV-7) both call this method without risk of
+   * creating duplicate stack entries.
+   */
   fun pushCounter(eventId: String) {
-    stackNavigation.pushNew(Config.Counter(id = eventId))
+    stackNavigation.pushToFront(Config.Counter(id = eventId))
   }
 
   /**
