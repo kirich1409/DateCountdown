@@ -2,6 +2,8 @@ plugins {
   id("datecountdown.android.application")
   id("datecountdown.android.compose")
   id("datecountdown.detekt")
+  alias(libs.plugins.kotlin.serialization)
+  alias(libs.plugins.metro)
 }
 
 android {
@@ -35,6 +37,19 @@ dependencies {
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.activity.compose)
+
+  // Metro DI runtime — KSP-generated graph implementation
+  implementation(libs.metro.runtime)
+
+  // Decompose: navigation + component context. api() from feature modules via android-feature
+  // convention is transitive to :app, but explicit here for RootComponent which lives in :app.
+  implementation(libs.decompose)
+  implementation(libs.decompose.extensions.compose)
+
+  // Feature modules — :app instantiates their component interfaces in RootComponent
+  implementation(project(":feature:list"))
+  implementation(project(":feature:counter"))
+  implementation(project(":feature:edit"))
 
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.tooling.preview)
