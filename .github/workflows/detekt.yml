@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           # JDK 21 required to RUN Gradle (Metro gradle-plugin 1.1.1 needs JVM 21+);
