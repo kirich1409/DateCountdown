@@ -8,8 +8,15 @@ package com.datecountdown.app.core.design.theme
  * Each entry carries:
  * - [symbolName] — the canonical Material Symbols Rounded glyph name.
  * - [codepoint] — the Unicode codepoint of the glyph in the bundled
- *   `material_symbols_rounded.ttf` variable font (res/font). Used by [EventSymbol]
+ *   `material_symbols_rounded.ttf` (res/font). Used by [EventSymbol]
  *   to render the icon without relying on ligature substitution.
+ *
+ * The bundled font is a 16-glyph static subset of Material Symbols Rounded with axes
+ * pinned to FILL=1 (filled style), wght=400, GRAD=0, opsz=24. To add an outline variant
+ * a separate font subset with FILL=0 would be needed.
+ *
+ * Codepoints are verified against `MaterialSymbolsRounded[FILL,GRAD,opsz,wght].codepoints`
+ * (google/material-design-icons, variablefont/).
  *
  * Entry order matches `m3-app.jsx:780` (the icon-picker row order).
  *
@@ -27,10 +34,10 @@ enum class EventIcon(
    */
   val symbolName: String,
   /**
-   * Unicode codepoint of this glyph in the bundled Material Symbols Rounded variable font.
+   * Unicode codepoint of this glyph in the bundled Material Symbols Rounded static font.
    *
-   * Verified against the font's cmap table (googlefonts/material-design-icons, variablefont/).
-   * When multiple codepoints alias the same glyph the lower value is used.
+   * Verified against the font's cmap table and the canonical codepoints file
+   * (google/material-design-icons, variablefont/).
    */
   val codepoint: Int,
 ) {
@@ -39,15 +46,15 @@ enum class EventIcon(
   BEACH_ACCESS("beach_access", 0xeb3e),
   ROCKET_LAUNCH("rocket_launch", 0xeb9b),
   SCHOOL("school", 0xe80c),
-  FAVORITE("favorite", 0xe87d),
-  MUSIC_NOTE("music_note", 0xe3a1),
+  FAVORITE("favorite", 0xe87e),
+  MUSIC_NOTE("music_note", 0xe405),
   DIRECTIONS_RUN("directions_run", 0xe566),
   FLIGHT("flight", 0xe539),
-  MOVIE("movie", 0xe02c),
+  MOVIE("movie", 0xe404),
   BOOK_2("book_2", 0xf53e),
   SPA("spa", 0xeb4c),
   RESTAURANT("restaurant", 0xe56c),
   SPORTS_ESPORTS("sports_esports", 0xea28),
-  REDEEM("redeem", 0xe8b1),
+  REDEEM("redeem", 0xe8f6),
   SNOWING("snowing", 0xe80f),
 }
