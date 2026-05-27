@@ -13,4 +13,7 @@ plugins {
 extensions.configure<ApplicationExtension> {
   configureKotlinAndroid(this)
   defaultConfig.targetSdk = 36
+  androidResources {
+    generateLocaleConfig = true
+  }
 }
