@@ -32,3 +32,10 @@ plugins {
 
 rootProject.name = "DateCountdown"
 include(":app")
+include(":domain")
+include(":data")
+include(":core:common")
+include(":core:design")
+include(":feature:list")
+include(":feature:counter")
+include(":feature:edit")
