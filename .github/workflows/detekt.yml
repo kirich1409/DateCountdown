@@ -27,9 +27,15 @@ jobs:
       - name: Run detekt
         run: ./gradlew detekt --no-daemon
 
+      - name: Collect SARIF reports
+        if: always()
+        run: |
+          mkdir -p sarif
+          find . -path '*/build/reports/detekt/*.sarif' -exec sh -c 'cp "$1" "sarif/$(echo "$1" | tr "/" "_")"' _ {} \;
+
       - name: Upload SARIF to GitHub Code Scanning
         if: always()
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: build/reports/detekt/merged.sarif
+          sarif_file: sarif
