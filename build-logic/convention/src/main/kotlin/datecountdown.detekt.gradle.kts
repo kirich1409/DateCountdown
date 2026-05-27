@@ -1,3 +1,4 @@
+import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 
 /**
@@ -15,6 +16,11 @@ extensions.configure<DetektExtension> {
   config.setFrom(rootProject.layout.projectDirectory.file("config/detekt/detekt.yml"))
   buildUponDefaultConfig = true
   parallel = true
+}
+
+tasks.withType<Detekt>().configureEach {
+  // SARIF output per module; CI collects and uploads all *.sarif files.
+  reports.sarif.required.set(true)
 }
 
 dependencies {
