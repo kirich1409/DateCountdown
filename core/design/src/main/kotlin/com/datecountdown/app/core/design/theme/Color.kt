@@ -1,3 +1,5 @@
+@file:Suppress("MagicNumber")
+
 package com.datecountdown.app.core.design.theme
 
 import androidx.compose.ui.graphics.Color

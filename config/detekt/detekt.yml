@@ -15,9 +15,6 @@ style:
     # flagging them as magic numbers produces only noise.
     ignoreAnnotated:
       - 'Composable'
-    # Top-level Color/dimension property declarations use numeric literals by definition.
-    # ignorePropertyDeclaration suppresses findings for all val/var at file and class scope.
-    ignorePropertyDeclaration: true
 
 Compose:
   active: true
