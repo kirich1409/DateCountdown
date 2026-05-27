@@ -1,0 +1,36 @@
+## DateCountdown detekt configuration.
+## Built on top of detekt's default config (buildUponDefaultConfig = true).
+## Compose rules come from io.nlopez.compose.rules:detekt (registered via detektPlugins).
+
+Compose:
+  active: true
+  ComposableNaming:
+    active: true
+  ContentEmitterReturningValues:
+    active: true
+  ModifierComposed:
+    active: true
+  ModifierMissing:
+    active: true
+  ModifierNotUsedAtRoot:
+    active: true
+  ModifierReused:
+    active: true
+  ModifierWithoutDefault:
+    active: true
+  MultipleEmitters:
+    active: true
+  MutableParams:
+    active: true
+  ComposableParamOrder:
+    active: true
+  PreviewPublic:
+    active: true
+  RememberMissing:
+    active: true
+  UnstableCollections:
+    active: false
+  ViewModelForwarding:
+    active: true
+  ViewModelInjection:
+    active: true
