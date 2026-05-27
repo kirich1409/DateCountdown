@@ -2,6 +2,23 @@
 ## Built on top of detekt's default config (buildUponDefaultConfig = true).
 ## Compose rules come from io.nlopez.compose.rules:detekt (registered via detektPlugins).
 
+naming:
+  FunctionNaming:
+    # PascalCase is the Compose convention for @Composable functions. Without this exclusion,
+    # detekt flags every top-level composable under the FunctionNaming rule.
+    ignoreAnnotated:
+      - 'Composable'
+
+style:
+  MagicNumber:
+    # Hex color literals inside @Composable bodies (e.g. Color(0xFF…)) are idiomatic Compose;
+    # flagging them as magic numbers produces only noise.
+    ignoreAnnotated:
+      - 'Composable'
+    # Top-level Color/dimension property declarations use numeric literals by definition.
+    # ignorePropertyDeclaration suppresses findings for all val/var at file and class scope.
+    ignorePropertyDeclaration: true
+
 Compose:
   active: true
   ComposableNaming:

@@ -8,9 +8,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import com.arkivanov.decompose.defaultComponentContext
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
+import com.datecountdown.app.core.design.theme.DateCountdownTheme
+import com.datecountdown.app.core.design.theme.ThemeMode
 import com.datecountdown.app.di.AppGraph
 import com.datecountdown.app.navigation.RootComponent
-import com.datecountdown.app.theme.DateCountdownTheme
 import dev.zacsweers.metro.createGraph
 
 /**
@@ -41,7 +42,9 @@ class MainActivity : ComponentActivity() {
 
     enableEdgeToEdge()
     setContent {
-      DateCountdownTheme {
+      // TODO(#28/#44): replace ThemeMode.SYSTEM with the DataStore-backed value from
+      //  SettingsRepository once issue #28 (settings persistence) lands.
+      DateCountdownTheme(themeMode = ThemeMode.SYSTEM) {
         // Placeholder: display the active stack config name so the skeleton is visually verifiable.
         // TODO(epic 4, #35/#39/#41): replace with NavHost that renders feature screens.
         val stack by root.stack.subscribeAsState()

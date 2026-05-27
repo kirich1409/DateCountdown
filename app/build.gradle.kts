@@ -46,6 +46,9 @@ dependencies {
   implementation(libs.decompose)
   implementation(libs.decompose.extensions.compose)
 
+  // Design system — theme, colors, typography
+  implementation(project(":core:design"))
+
   // Feature modules — :app instantiates their component interfaces in RootComponent
   implementation(project(":feature:list"))
   implementation(project(":feature:counter"))
