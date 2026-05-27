@@ -15,7 +15,9 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          # JDK 21 required to RUN Gradle (Metro gradle-plugin 1.1.1 needs JVM 21+);
+          # the app still compiles to toolchain 17 via jvmToolchain(17).
+          java-version: '21'
 
       - uses: gradle/actions/setup-gradle@v4
 

@@ -23,7 +23,7 @@ Configuration cache and build cache are on by default (`gradle.properties`).
 
 ## Toolchain
 
-- **AGP 9.0.1**, **Kotlin 2.3.20**, **KSP 2.3.9**, JDK 17 toolchain
+- **AGP 9.0.1**, **Kotlin 2.3.20**, **KSP 2.3.9**, JDK 17 toolchain (compile); Gradle itself must run on JDK 21+ (Metro gradle-plugin 1.1.1 requires JVM 21+)
 - `minSdk 29`, `compileSdk`/`targetSdk 36`
 - Gradle wrapper 9.1.0
 
