@@ -164,7 +164,7 @@ kotlinx-datetime, KSP 2.3.9, Kotlin 2.3.20, AGP 9.0.1, JDK 17, `minSdk 29` / `ta
 | `:core:common` | `android-library` |
 | `:data` | `android-library` + `ksp` (Room) |
 | `:domain` | `kotlin-library` (чистый Kotlin, без Android-плагина) |
-| `build-logic` | includedBuild; AGP через `compileOnly`; `detekt` (1.23.8, `android.newDsl=false`+`builtInKotlin=false`) применяется проектно |
+| `build-logic` | includedBuild; AGP через `compileOnly`; `detekt` (1.23.8, compose-rules) применяется проектно; AGP 9 built-in Kotlin сохранён — `builtInKotlin=false` не нужен; если потребуется переопределить версию KGP, механизм — buildscript classpath KGP upgrade (см. `docs/spikes/1.0-stack-compat.md`), не `builtInKotlin=false` |
 
 **Синонимы (флаг для #14):** `android-app` ≡ `android.application`; `compose` ≡ `compose.library`;
 `kotlin-serialization` ≡ `kotlin.serialization`. `android-feature` фигурирует только в #13 — это composite
