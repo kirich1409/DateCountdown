@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network security config (AC-TH-9): no cleartext traffic allowed.
+  DateCountdown is a fully offline app — there is no INTERNET permission and no
+  network calls. This config makes that intent explicit and enforced at the OS level.
+-->
+<network-security-config>
+  <base-config cleartextTrafficPermitted="false" />
+</network-security-config>
