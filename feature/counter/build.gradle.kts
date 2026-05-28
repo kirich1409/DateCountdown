@@ -23,4 +23,8 @@ dependencies {
   // kotlinx-datetime is an implementation dep in :domain and therefore not visible here.
   // The Store uses Instant and Clock directly, so we declare it explicitly.
   implementation(libs.kotlinx.datetime)
+
+  testImplementation(libs.junit)
+  testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(libs.turbine)
 }
