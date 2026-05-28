@@ -72,13 +72,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.datecountdown.app.core.design.theme.BlobShape
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
-import com.datecountdown.app.core.design.theme.EventIcon as DesignEventIcon
 import com.datecountdown.app.core.design.theme.EventPaletteId
-import com.datecountdown.app.core.design.theme.EventSymbol
 import com.datecountdown.app.core.design.theme.eventPaletteByIndex
 import com.datecountdown.app.domain.Event
 import com.datecountdown.app.domain.EventColor
@@ -456,13 +453,15 @@ private fun EventsGrid(
       }
 
       if (!pastCollapsed) {
-        items(
+        itemsIndexed(
           items = past,
-          key = { "past_${it.id.value}" },
-          contentType = { "event_card" },
-        ) { event ->
+          key = { _, event -> "past_${event.id.value}" },
+          contentType = { _, _ -> "event_card" },
+        ) { index, event ->
           SwipeToDismissPastCard(
             event = event,
+            now = now,
+            shapeVariant = SHAPE_VARIANTS[index % SHAPE_VARIANTS.size],
             onCardClick = { onCardClick(event.id.value) },
             onDelete = { onDelete(event.id) },
           )
@@ -518,13 +517,18 @@ private fun SwipeToDismissEventCard(
 }
 
 /**
- * Wraps a past-event placeholder card in a [SwipeToDismissBox].
- * Full past card implementation is deferred to issue #38.
+ * Wraps a [PastEventCard] in a [SwipeToDismissBox] (end-to-start only, ≥50% threshold).
+ *
+ * @param now          Reference instant passed through to [PastEventCard] (AC-CL-12).
+ * @param shapeVariant The [BlobShape] for the card outline, cycled by grid index.
  */
+@Suppress("LongParameterList")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToDismissPastCard(
   event: Event,
+  now: Instant,
+  shapeVariant: BlobShape,
   onCardClick: () -> Unit,
   onDelete: () -> Unit,
   modifier: Modifier = Modifier,
@@ -548,7 +552,7 @@ private fun SwipeToDismissPastCard(
     enableDismissFromEndToStart = true,
     backgroundContent = { SwipeDeleteBackground() },
   ) {
-    PastEventCardPlaceholder(event = event, onClick = onCardClick)
+    PastEventCard(event = event, now = now, shapeVariant = shapeVariant, onClick = onCardClick)
   }
 }
 
@@ -578,76 +582,6 @@ private fun SwipeDeleteBackground(modifier: Modifier = Modifier) {
         imageVector = Icons.Filled.Delete,
         contentDescription = stringResource(R.string.list_swipe_delete_icon_description),
         tint = MaterialTheme.colorScheme.onErrorContainer,
-      )
-    }
-  }
-}
-
-// ── Past event card (placeholder — full implementation in issue #38) ─────────────────────────────
-
-/**
- * Placeholder past-event card for the list screen.
- *
- * Renders the event's color palette and icon blob (72dp, [BlobShape.Variant4]) with the event
- * title. Full past-card content is implemented in issue #38. The card is a single merged
- * semantics node for accessibility (AC-LS-7, AC-LS-20).
- *
- * Square `aspectRatio(1f)` approximates the design's ~204dp card height in a 2-column grid.
- */
-@Composable
-private fun PastEventCardPlaceholder(
-  event: Event,
-  onClick: () -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  val isDark = isSystemInDarkTheme()
-  val palette = remember(event.color.ordinal, isDark) {
-    eventPaletteByIndex(index = event.color.ordinal, dark = isDark)
-  }
-  val designIcon = remember(event.icon.ordinal) {
-    DesignEventIcon.entries[event.icon.ordinal]
-  }
-  val iconDesc = stringResource(R.string.list_card_icon_description, designIcon.symbolName)
-
-  Box(
-    modifier = modifier
-      .fillMaxWidth()
-      .aspectRatio(ratio = 1f)
-      .clip(BlobShape.Variant4)
-      .background(palette.container)
-      .clickable(role = Role.Button, onClickLabel = event.title, onClick = onClick)
-      .semantics(mergeDescendants = true) {
-        contentDescription = event.title
-      },
-    contentAlignment = Alignment.Center,
-  ) {
-    Column(
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(8.dp),
-      modifier = Modifier.padding(16.dp),
-    ) {
-      // Icon blob (72dp, Variant4) — placeholder; full rendering in issues #37/#38.
-      Box(
-        modifier = Modifier
-          .size(72.dp)
-          .clip(BlobShape.Variant4)
-          .background(palette.hero),
-        contentAlignment = Alignment.Center,
-      ) {
-        EventSymbol(
-          icon = designIcon,
-          size = 36.sp,
-          tint = palette.onHero,
-          contentDescription = iconDesc,
-        )
-      }
-
-      Text(
-        text = event.title,
-        style = MaterialTheme.typography.bodyMedium,
-        color = palette.onContainer,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
       )
     }
   }
@@ -1018,17 +952,3 @@ private fun EventListErrorPreview() {
   }
 }
 
-@Suppress("UnusedPrivateMember")
-@Preview(name = "PastEventCardPlaceholder — Teal/Flight", showBackground = true)
-@Composable
-private fun PastEventCardPlaceholderPreview() {
-  DateCountdownTheme {
-    Surface {
-      PastEventCardPlaceholder(
-        event = previewEvent("p1", "Trip to Japan", -14, EventColor.TEAL, DomainEventIcon.FLIGHT),
-        onClick = {},
-        modifier = Modifier.size(180.dp),
-      )
-    }
-  }
-}

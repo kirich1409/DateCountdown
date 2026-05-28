@@ -61,6 +61,12 @@
     <item quantity="other">%d days left</item>
   </plurals>
 
+  <!-- Past event card (issue #38) -->
+  <string name="past_badge">PAST</string>
+  <string name="past_card_today_label">Today</string>
+  <!-- %1$s = event title, %2$s = time clause ("Today" or "N days ago") -->
+  <string name="past_card_a11y_description">%1$s, %2$s</string>
+
   <!-- More menu -->
   <string name="list_menu_settings">Settings</string>
   <string name="list_menu_enable_notifications">Enable notifications</string>
