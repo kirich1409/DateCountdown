@@ -1,5 +1,11 @@
 package com.datecountdown.app.navigation
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -7,21 +13,33 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.res.stringResource
+import androidx.core.app.ActivityCompat
+import com.datecountdown.app.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.stack.animation.slide
@@ -63,7 +81,7 @@ import kotlinx.coroutines.launch
  * is therefore used as a non-predictive fallback; predictive-back gesture is still active at the OS
  * level via [android:enableOnBackInvokedCallback="true"] in the manifest.
  */
-@Suppress("LongMethod")
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun RootContent(
@@ -79,8 +97,20 @@ internal fun RootContent(
   val requestedOnce by settings.notificationsPermissionRequested
     .collectAsStateWithLifecycle(initialValue = false)
 
-  // Recompute on every recomposition so the banner disappears immediately after grant.
-  val isGranted = checkPostNotificationsGranted(context)
+  // ON_RESUME observer: bump a counter each time the Activity resumes so that isGranted
+  // is recomputed after the user returns from system Settings (AC-NT-12 banner-dismissal).
+  val lifecycleOwner = LocalLifecycleOwner.current
+  var resumeTick by remember { mutableStateOf(0) }
+  DisposableEffect(lifecycleOwner) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (event == Lifecycle.Event.ON_RESUME) resumeTick++
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+  }
+
+  // resumeTick as key ensures recomputation on every resume — including after Settings return.
+  val isGranted = remember(resumeTick) { checkPostNotificationsGranted(context) }
   val shouldShowBanner = isPostNotificationsRequired() && requestedOnce && !isGranted
 
   // Keep a fresh reference to the persist call so the launcher callback is always up to date.
@@ -96,8 +126,25 @@ internal fun RootContent(
     scope.launch { currentSetRequested() }
   }
 
-  val triggerRequest: () -> Unit = remember(launcher) {
-    { launcher.launch(POST_NOTIFICATIONS_PERMISSION) }
+  var showRationale by remember { mutableStateOf(false) }
+
+  // triggerRequest keys on launcher + isGranted + requestedOnce so the lambda always captures
+  // the latest permission state without going stale between recompositions.
+  val triggerRequest: () -> Unit = remember(launcher, isGranted, requestedOnce) {
+    {
+      val activity = context.findActivity()
+      val isPermanentlyDenied = activity != null &&
+        requestedOnce && !isGranted &&
+        !ActivityCompat.shouldShowRequestPermissionRationale(activity, POST_NOTIFICATIONS_PERMISSION)
+      val shouldShowRationale = activity != null &&
+        ActivityCompat.shouldShowRequestPermissionRationale(activity, POST_NOTIFICATIONS_PERMISSION)
+
+      when {
+        isPermanentlyDenied -> openAppSettings(context)
+        shouldShowRationale -> showRationale = true
+        else -> launcher.launch(POST_NOTIFICATIONS_PERMISSION)
+      }
+    }
   }
 
   // Auto-trigger: fires once per session when editSlot first becomes non-null.
@@ -122,6 +169,16 @@ internal fun RootContent(
   }
 
   // --- UI ------------------------------------------------------------------------------------
+
+  if (showRationale) {
+    PermissionRationaleDialog(
+      onConfirm = {
+        showRationale = false
+        launcher.launch(POST_NOTIFICATIONS_PERMISSION)
+      },
+      onDismiss = { showRationale = false },
+    )
+  }
 
   CompositionLocalProvider(LocalNotificationPermissionState provides permissionState) {
     Children(
@@ -161,4 +218,48 @@ internal fun RootContent(
       }
     }
   }
+}
+
+/**
+ * Dialog explaining why POST_NOTIFICATIONS is needed (AC-NT-11 rationale step).
+ *
+ * Shown when [ActivityCompat.shouldShowRequestPermissionRationale] returns `true`.
+ * Confirms the user-intent before re-launching the system permission dialog.
+ */
+@Composable
+private fun PermissionRationaleDialog(
+  onConfirm: () -> Unit,
+  onDismiss: () -> Unit,
+) {
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text(stringResource(R.string.permission_rationale_title)) },
+    text = { Text(stringResource(R.string.permission_rationale_message)) },
+    confirmButton = {
+      TextButton(onClick = onConfirm) {
+        Text(stringResource(R.string.permission_rationale_confirm))
+      }
+    },
+    dismissButton = {
+      TextButton(onClick = onDismiss) {
+        Text(stringResource(R.string.permission_rationale_cancel))
+      }
+    },
+  )
+}
+
+/** Walks the [Context] wrapper chain to find the hosting [Activity], or `null` if not found. */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+  is Activity -> this
+  is ContextWrapper -> baseContext.findActivity()
+  else -> null
+}
+
+/** Opens the system App Details settings screen for this app (AC-NT-12 permanent-deny path). */
+private fun openAppSettings(context: Context) {
+  val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+    data = Uri.fromParts("package", context.packageName, null)
+    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+  }
+  context.startActivity(intent)
 }

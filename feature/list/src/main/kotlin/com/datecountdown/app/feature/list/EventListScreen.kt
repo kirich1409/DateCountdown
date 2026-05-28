@@ -212,25 +212,35 @@ internal fun EventListScreenContent(
       )
     },
   ) { innerPadding ->
-    when (state) {
-      EventListState.Loading -> LoadingContent(
-        modifier = Modifier.fillMaxSize().padding(innerPadding),
-      )
+    // Banner is hoisted above the state branch so it renders in Loading / Error states too (AC-NT-12).
+    val permissionState = LocalNotificationPermissionState.current
+    Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+      if (permissionState.shouldShowBanner) {
+        NotificationBanner(
+          onBannerClick = permissionState.triggerRequest,
+          modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+      }
+      when (state) {
+        EventListState.Loading -> LoadingContent(
+          modifier = Modifier.weight(weight = 1f),
+        )
 
-      is EventListState.Error -> ErrorContent(
-        message = stringResource(R.string.list_error_message),
-        modifier = Modifier.fillMaxSize().padding(innerPadding),
-      )
+        is EventListState.Error -> ErrorContent(
+          message = stringResource(R.string.list_error_message),
+          modifier = Modifier.weight(weight = 1f),
+        )
 
-      is EventListState.Content -> ContentBody(
-        state = state,
-        isGlobalEmpty = isGlobalEmpty,
-        onCardClick = onCardClick,
-        onAddClick = onAddClick,
-        onDelete = onDelete,
-        onTogglePast = onTogglePast,
-        modifier = Modifier.fillMaxSize().padding(innerPadding),
-      )
+        is EventListState.Content -> ContentBody(
+          state = state,
+          isGlobalEmpty = isGlobalEmpty,
+          onCardClick = onCardClick,
+          onAddClick = onAddClick,
+          onDelete = onDelete,
+          onTogglePast = onTogglePast,
+          modifier = Modifier.weight(weight = 1f),
+        )
+      }
     }
   }
 }
@@ -494,9 +504,6 @@ private fun EventsGrid(
   onTogglePast: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  // Hoist CompositionLocal read here — LazyGridScope DSL is not @Composable.
-  val permissionState = LocalNotificationPermissionState.current
-
   LazyVerticalGrid(
     columns = GridCells.Fixed(count = 2),
     modifier = modifier,
@@ -509,13 +516,6 @@ private fun EventsGrid(
     verticalArrangement = Arrangement.spacedBy(12.dp),
     horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    // AC-NT-12: persistent notification-disabled banner — full-width, above filter chips.
-    if (permissionState.shouldShowBanner) {
-      item(span = { GridItemSpan(maxLineSpan) }, contentType = "notification_banner") {
-        NotificationBanner(onBannerClick = permissionState.triggerRequest)
-      }
-    }
-
     item(span = { GridItemSpan(maxLineSpan) }, contentType = "filter_chips") {
       FilterChipsRow()
     }

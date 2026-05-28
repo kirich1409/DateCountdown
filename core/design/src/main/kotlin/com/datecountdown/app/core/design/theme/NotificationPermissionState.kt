@@ -1,3 +1,7 @@
+// TODO(arch debt): NotificationPermissionState is app-level state, not a design token.
+// Long-term home: :core:common (requires adding compose-runtime dep) or a new :core:ui module.
+// Kept in :core:design temporarily to avoid the broader refactor. Don't add more
+// non-design types here as precedent.
 package com.datecountdown.app.core.design.theme
 
 import androidx.compose.runtime.compositionLocalOf
