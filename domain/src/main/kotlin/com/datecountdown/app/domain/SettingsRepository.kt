@@ -27,4 +27,14 @@ interface SettingsRepository {
 
   /** Persists the [value] for the "past events" collapsed state (AC-DM-10). */
   suspend fun setPastCollapsed(value: Boolean)
+
+  /**
+   * Emits whether the POST_NOTIFICATIONS runtime permission has been requested at least once
+   * and re-emits on change (AC-NT-11).
+   * Defaults to `false` when no preference has been stored.
+   */
+  val notificationsPermissionRequested: Flow<Boolean>
+
+  /** Persists the fact that POST_NOTIFICATIONS was requested (AC-NT-11). */
+  suspend fun setNotificationsPermissionRequested()
 }

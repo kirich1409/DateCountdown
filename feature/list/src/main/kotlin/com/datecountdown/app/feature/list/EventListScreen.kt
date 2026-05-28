@@ -25,10 +25,12 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -56,6 +58,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -81,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.datecountdown.app.core.design.theme.BlobShape
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
+import com.datecountdown.app.core.design.theme.LocalNotificationPermissionState
 import com.datecountdown.app.core.design.theme.EventPaletteId
 import com.datecountdown.app.core.design.theme.eventPaletteByIndex
 import com.datecountdown.app.domain.Event
@@ -300,6 +304,7 @@ private fun ContentBody(
 
 // ── Top App Bar ──────────────────────────────────────────────────────────────────────────────────
 
+@Suppress("LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ListTopBar(
@@ -367,8 +372,17 @@ private fun ListTopBar(
               onSettingsClick()
             },
           )
-          // AC-LS-19: "Enable notifications" item shown only when runtime permission is absent.
-          // Permission checking is implemented in issue #44.
+          // AC-LS-19: "Enable notifications" item — visible only when banner is active.
+          val permissionState = LocalNotificationPermissionState.current
+          if (permissionState.shouldShowBanner) {
+            DropdownMenuItem(
+              text = { Text(stringResource(R.string.list_menu_enable_notifications)) },
+              onClick = {
+                menuExpanded = false
+                permissionState.triggerRequest()
+              },
+            )
+          }
         }
       }
     },
@@ -414,6 +428,50 @@ private fun FilterChipsRow(modifier: Modifier = Modifier) {
   }
 }
 
+// ── Notification disabled banner ─────────────────────────────────────────────────────────────────
+
+/**
+ * Persistent banner shown when POST_NOTIFICATIONS permission is absent (AC-NT-12).
+ *
+ * Visible only when [LocalNotificationPermissionState.shouldShowBanner] is `true`.
+ * Tapping anywhere on the banner triggers the permission request launcher.
+ *
+ * Accessibility:
+ * - Icon is decorative (`contentDescription = null`) — the Text already describes the action.
+ * - The whole [Surface] is the touch target (natural height ≥ 48 dp with 12 dp vertical padding).
+ */
+@Composable
+private fun NotificationBanner(
+  onBannerClick: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  Surface(
+    onClick = onBannerClick,
+    modifier = modifier.fillMaxWidth(),
+    shape = RoundedCornerShape(12.dp),
+    color = MaterialTheme.colorScheme.tertiaryContainer,
+    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+  ) {
+    Row(
+      modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      Icon(
+        imageVector = Icons.Filled.Notifications,
+        // Decorative — the adjacent Text is the accessible label for this action.
+        contentDescription = null,
+      )
+      Text(
+        text = stringResource(R.string.list_notifications_disabled_banner),
+        style = MaterialTheme.typography.bodyMedium,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+      )
+    }
+  }
+}
+
 // ── Events grid ──────────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -436,6 +494,9 @@ private fun EventsGrid(
   onTogglePast: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  // Hoist CompositionLocal read here — LazyGridScope DSL is not @Composable.
+  val permissionState = LocalNotificationPermissionState.current
+
   LazyVerticalGrid(
     columns = GridCells.Fixed(count = 2),
     modifier = modifier,
@@ -448,6 +509,13 @@ private fun EventsGrid(
     verticalArrangement = Arrangement.spacedBy(12.dp),
     horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
+    // AC-NT-12: persistent notification-disabled banner — full-width, above filter chips.
+    if (permissionState.shouldShowBanner) {
+      item(span = { GridItemSpan(maxLineSpan) }, contentType = "notification_banner") {
+        NotificationBanner(onBannerClick = permissionState.triggerRequest)
+      }
+    }
+
     item(span = { GridItemSpan(maxLineSpan) }, contentType = "filter_chips") {
       FilterChipsRow()
     }
@@ -1111,6 +1179,44 @@ private fun SettingsThemeDialogDarkPreview() {
       onModeSelected = {},
       onDismiss = {},
     )
+  }
+}
+
+@Suppress("UnusedPrivateMember")
+@PreviewLightDark
+@Composable
+private fun NotificationBannerPreview() {
+  DateCountdownTheme {
+    NotificationBanner(onBannerClick = {})
+  }
+}
+
+@Suppress("UnusedPrivateMember")
+@PreviewLightDark
+@Composable
+private fun EventListWithNotificationBannerPreview() {
+  DateCountdownTheme {
+    CompositionLocalProvider(
+      LocalNotificationPermissionState provides com.datecountdown.app.core.design.theme.NotificationPermissionState(
+        shouldShowBanner = true,
+        triggerRequest = {},
+      ),
+    ) {
+      EventListScreenContent(
+        state = EventListState.Content(
+          upcoming = previewUpcoming,
+          past = emptyList(),
+          pastCollapsed = false,
+          pendingDelete = null,
+        ),
+        onCardClick = {},
+        onAddClick = {},
+        onDelete = {},
+        onUndoDelete = {},
+        onTogglePast = {},
+        onThemeModeChange = {},
+      )
+    }
   }
 }
 

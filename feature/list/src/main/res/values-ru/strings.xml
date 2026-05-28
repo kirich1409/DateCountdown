@@ -75,6 +75,9 @@
   <string name="list_menu_settings">Настройки</string>
   <string name="list_menu_enable_notifications">Включить уведомления</string>
 
+  <!-- Notification-disabled persistent banner (AC-NT-12) -->
+  <string name="list_notifications_disabled_banner">Уведомления выключены — включить</string>
+
   <!-- Theme settings dialog -->
   <string name="settings_theme_title">Тема</string>
   <string name="settings_theme_system">Системная</string>

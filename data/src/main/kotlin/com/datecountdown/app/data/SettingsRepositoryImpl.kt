@@ -42,8 +42,16 @@ class SettingsRepositoryImpl(
     dataStore.edit { prefs -> prefs[KEY_PAST_COLLAPSED] = value }
   }
 
+  override val notificationsPermissionRequested: Flow<Boolean> =
+    dataStore.data.map { prefs -> prefs[KEY_NOTIFICATIONS_PERM_REQUESTED] ?: false }
+
+  override suspend fun setNotificationsPermissionRequested() {
+    dataStore.edit { prefs -> prefs[KEY_NOTIFICATIONS_PERM_REQUESTED] = true }
+  }
+
   private companion object {
     val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
     val KEY_PAST_COLLAPSED = booleanPreferencesKey("past_collapsed")
+    val KEY_NOTIFICATIONS_PERM_REQUESTED = booleanPreferencesKey("notifications_permission_requested")
   }
 }

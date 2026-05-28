@@ -8,6 +8,10 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Required to receive ACTION_BOOT_COMPLETED for alarm restoration (AC-NT-9). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- POST_NOTIFICATIONS: runtime permission required on Android 13+ (API 33+) to post
+         local notifications (AC-NT-11). The system omits this permission silently on older
+         versions; presence here does not affect API < 33 behavior. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="false"
