@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -425,15 +426,24 @@ private fun EventsGrid(
       FilterChipsRow()
     }
 
+    // Compute now once for the entire grid — no per-second ticking (AC-CL-12).
+    val now = Clock.System.now()
+
     if (upcoming.isEmpty()) {
       // PartialEmpty: upcoming=0 but past>0 — show inline placeholder (AC-LS-15).
       item(span = { GridItemSpan(maxLineSpan) }, contentType = "partial_empty") {
         PartialEmptyState(onAddClick = onAddClick)
       }
     } else {
-      items(items = upcoming, key = { it.id.value }, contentType = { "event_card" }) { event ->
+      itemsIndexed(
+        items = upcoming,
+        key = { _, event -> event.id.value },
+        contentType = { _, _ -> "event_card" },
+      ) { index, event ->
         SwipeToDismissEventCard(
           event = event,
+          now = now,
+          shapeVariant = SHAPE_VARIANTS[index % SHAPE_VARIANTS.size],
           onCardClick = { onCardClick(event.id.value) },
           onDelete = { onDelete(event.id) },
         )
@@ -451,7 +461,7 @@ private fun EventsGrid(
           key = { "past_${it.id.value}" },
           contentType = { "event_card" },
         ) { event ->
-          SwipeToDismissEventCard(
+          SwipeToDismissPastCard(
             event = event,
             onCardClick = { onCardClick(event.id.value) },
             onDelete = { onDelete(event.id) },
@@ -465,14 +475,55 @@ private fun EventsGrid(
 // ── Swipe-to-dismiss card wrapper ────────────────────────────────────────────────────────────────
 
 /**
- * Wraps an [EventCard] in a [SwipeToDismissBox] (end-to-start only, ≥50% threshold).
+ * Wraps an upcoming [EventCard] in a [SwipeToDismissBox] (end-to-start only, ≥50% threshold).
  *
  * AC-LS-8: when the swipe is released at ≥50% of the total swipe distance the delete is
  * committed; below 50% the card snaps back.
+ *
+ * @param now Reference instant passed through to [EventCard] for countdown calculation (AC-CL-12).
+ * @param shapeVariant The [BlobShape] for the card outline, cycled by grid index.
  */
+@Suppress("LongParameterList")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToDismissEventCard(
+  event: Event,
+  now: Instant,
+  shapeVariant: BlobShape,
+  onCardClick: () -> Unit,
+  onDelete: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  val dismissState = rememberSwipeToDismissBoxState(
+    confirmValueChange = { value ->
+      if (value == SwipeToDismissBoxValue.EndToStart) {
+        onDelete()
+        true
+      } else {
+        false
+      }
+    },
+    positionalThreshold = { totalDistance -> totalDistance * 0.5f },
+  )
+
+  SwipeToDismissBox(
+    state = dismissState,
+    modifier = modifier,
+    enableDismissFromStartToEnd = false,
+    enableDismissFromEndToStart = true,
+    backgroundContent = { SwipeDeleteBackground() },
+  ) {
+    EventCard(event = event, now = now, shapeVariant = shapeVariant, onClick = onCardClick)
+  }
+}
+
+/**
+ * Wraps a past-event placeholder card in a [SwipeToDismissBox].
+ * Full past card implementation is deferred to issue #38.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeToDismissPastCard(
   event: Event,
   onCardClick: () -> Unit,
   onDelete: () -> Unit,
@@ -497,7 +548,7 @@ private fun SwipeToDismissEventCard(
     enableDismissFromEndToStart = true,
     backgroundContent = { SwipeDeleteBackground() },
   ) {
-    EventCard(event = event, onClick = onCardClick)
+    PastEventCardPlaceholder(event = event, onClick = onCardClick)
   }
 }
 
@@ -532,20 +583,19 @@ private fun SwipeDeleteBackground(modifier: Modifier = Modifier) {
   }
 }
 
-// ── Event card (placeholder) ─────────────────────────────────────────────────────────────────────
+// ── Past event card (placeholder — full implementation in issue #38) ─────────────────────────────
 
 /**
- * Placeholder event card for the list screen.
+ * Placeholder past-event card for the list screen.
  *
  * Renders the event's color palette and icon blob (72dp, [BlobShape.Variant4]) with the event
- * title. Full card content — date chip, countdown number, days-remaining label — is implemented
- * in issue #37 (upcoming) and #38 (past). The card is a single merged semantics node for
- * accessibility (AC-LS-7, AC-LS-20).
+ * title. Full past-card content is implemented in issue #38. The card is a single merged
+ * semantics node for accessibility (AC-LS-7, AC-LS-20).
  *
  * Square `aspectRatio(1f)` approximates the design's ~204dp card height in a 2-column grid.
  */
 @Composable
-private fun EventCard(
+private fun PastEventCardPlaceholder(
   event: Event,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
@@ -969,13 +1019,13 @@ private fun EventListErrorPreview() {
 }
 
 @Suppress("UnusedPrivateMember")
-@Preview(name = "EventCard — Teal/Flight", showBackground = true)
+@Preview(name = "PastEventCardPlaceholder — Teal/Flight", showBackground = true)
 @Composable
-private fun EventCardPreview() {
+private fun PastEventCardPlaceholderPreview() {
   DateCountdownTheme {
     Surface {
-      EventCard(
-        event = previewEvent("p1", "Trip to Japan", 14, EventColor.TEAL, DomainEventIcon.FLIGHT),
+      PastEventCardPlaceholder(
+        event = previewEvent("p1", "Trip to Japan", -14, EventColor.TEAL, DomainEventIcon.FLIGHT),
         onClick = {},
         modifier = Modifier.size(180.dp),
       )

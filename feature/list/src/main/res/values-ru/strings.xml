@@ -55,6 +55,15 @@
 
   <!-- Card icon accessibility -->
   <string name="list_card_icon_description">Иконка %s</string>
+  <string name="list_card_a11y_description">%1$s, %2$d дней до %3$s</string>
+
+  <!-- Days-remaining label on the upcoming event card -->
+  <plurals name="days_left">
+    <item quantity="one">%d день осталось</item>
+    <item quantity="few">%d дня осталось</item>
+    <item quantity="many">%d дней осталось</item>
+    <item quantity="other">%d дней осталось</item>
+  </plurals>
 
   <!-- More menu -->
   <string name="list_menu_settings">Настройки</string>
