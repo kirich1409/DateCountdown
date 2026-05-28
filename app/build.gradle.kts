@@ -47,6 +47,13 @@ dependencies {
   implementation(libs.decompose)
   implementation(libs.decompose.extensions.compose)
 
+  // Domain layer — EventsRepository interface used in AppGraph accessor and provider return type
+  implementation(project(":domain"))
+  // Data layer — EventsRepositoryImpl, AppDatabase, EventDao
+  implementation(project(":data"))
+  // Room runtime needed here to call Room.databaseBuilder in AppGraph
+  implementation(libs.androidx.room.runtime)
+
   // Design system — theme, colors, typography
   implementation(project(":core:design"))
 

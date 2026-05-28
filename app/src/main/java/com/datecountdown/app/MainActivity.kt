@@ -12,13 +12,14 @@ import com.datecountdown.app.core.design.theme.DateCountdownTheme
 import com.datecountdown.app.core.design.theme.ThemeMode
 import com.datecountdown.app.di.AppGraph
 import com.datecountdown.app.navigation.RootComponent
-import dev.zacsweers.metro.createGraph
+import dev.zacsweers.metro.createGraphFactory
 
 /**
  * Composition root for the application.
  *
  * Pattern (per spike 1.0):
- *  1. Metro [AppGraph] is created once here via [createGraph]; its lifetime spans the Activity.
+ *  1. Metro [AppGraph] is created once via [createGraphFactory] + [AppGraph.Factory.create];
+ *     its lifetime spans the Activity.
  *  2. [RootComponent] is created with [defaultComponentContext] — this binds Decompose's
  *     lifecycle/state-keeper/back-handler to the Activity (requires [ComponentActivity]).
  *  3. [setContent] renders a minimal placeholder; epic 4 replaces this with the real nav host.
@@ -31,11 +32,10 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
-    // Metro root graph — holds all app-scoped dependencies.
-    // Real bindings (EventsRepositoryImpl, NotificationScheduler) added in epics 2/3 (#25-27, #29).
-    // Currently empty; will be passed into RootComponent constructor when bindings exist.
+    // Metro root graph — holds all app-scoped singletons (AppDatabase, EventDao, EventsRepository).
+    // Application is passed through AppGraph.Factory so Room.databaseBuilder has a Context.
     @Suppress("UnusedPrivateProperty")
-    val graph: AppGraph = createGraph()
+    val graph: AppGraph = createGraphFactory<AppGraph.Factory>().create(application)
 
     // Decompose root component — binds navigation lifecycle to this Activity.
     val root = RootComponent(componentContext = defaultComponentContext())
