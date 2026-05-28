@@ -65,6 +65,12 @@
     <item quantity="other">%d дней осталось</item>
   </plurals>
 
+  <!-- Past event card (issue #38) -->
+  <string name="past_badge">ПРОШЛО</string>
+  <string name="past_card_today_label">Сегодня</string>
+  <!-- %1$s = название события, %2$s = временная фраза ("Сегодня" или "N дней назад") -->
+  <string name="past_card_a11y_description">%1$s, %2$s</string>
+
   <!-- More menu -->
   <string name="list_menu_settings">Настройки</string>
   <string name="list_menu_enable_notifications">Включить уведомления</string>
