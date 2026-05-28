@@ -1,11 +1,19 @@
 package com.datecountdown.app.navigation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.stack.animation.slide
 import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
@@ -53,6 +61,18 @@ internal fun RootContent(
         editChild.component.onDismissRequest()
       },
       sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+      // Decorative pill — no accessibility node (TalkBack must not announce it).
+      // M3 default DragHandle announces itself as "drag handle", which is noise for a
+      // decorative element.
+      dragHandle = {
+        Box(
+          modifier = Modifier
+            .padding(vertical = 12.dp)
+            .size(width = 32.dp, height = 4.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(MaterialTheme.colorScheme.outlineVariant),
+        )
+      },
     ) {
       AddEditScreen(component = editChild.component)
     }
