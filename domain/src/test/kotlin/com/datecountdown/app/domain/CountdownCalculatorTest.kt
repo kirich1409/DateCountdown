@@ -22,6 +22,8 @@ class CountdownCalculatorTest {
 
   private val calculator = CountdownCalculator(timeZone = TimeZone.UTC)
 
+  // Test fixture mirroring LocalDateTime constructor — six params are inherent to the domain.
+  @Suppress("LongParameterList")
   private fun ts(
     year: Int,
     month: Int,
@@ -75,7 +77,9 @@ class CountdownCalculatorTest {
     val now = ts(2026, 5, 28, hour = 12, minute = 0, second = 0)
     val target = ts(2026, 5, 28, hour = 12, minute = 0, second = 1)
     assertEquals(
-      CountdownResult.Upcoming(years = 0, days = 0, hours = 0, minutes = 0, seconds = 1, primary = CountdownUnit.SECONDS),
+      CountdownResult.Upcoming(
+        years = 0, days = 0, hours = 0, minutes = 0, seconds = 1, primary = CountdownUnit.SECONDS,
+      ),
       calculator.calculate(target = target, now = now),
     )
   }
@@ -85,7 +89,9 @@ class CountdownCalculatorTest {
     val now = ts(2026, 5, 28, hour = 12, minute = 0)
     val target = ts(2026, 5, 28, hour = 12, minute = 1)
     assertEquals(
-      CountdownResult.Upcoming(years = 0, days = 0, hours = 0, minutes = 1, seconds = 0, primary = CountdownUnit.MINUTES),
+      CountdownResult.Upcoming(
+        years = 0, days = 0, hours = 0, minutes = 1, seconds = 0, primary = CountdownUnit.MINUTES,
+      ),
       calculator.calculate(target = target, now = now),
     )
   }
