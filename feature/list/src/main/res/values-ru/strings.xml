@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Top App Bar -->
+  <string name="list_title">Обратный отсчёт</string>
+  <string name="list_menu_description">Меню</string>
+  <string name="list_search_description">Поиск</string>
+  <string name="list_more_description">Ещё</string>
+
+  <!-- Subtitle plurals: "N событий впереди" / "Пока ничего не запланировано" -->
+  <plurals name="list_subtitle_events_ahead">
+    <item quantity="one">%d событие впереди</item>
+    <item quantity="few">%d события впереди</item>
+    <item quantity="many">%d событий впереди</item>
+    <item quantity="other">%d событий впереди</item>
+  </plurals>
+  <string name="list_subtitle_empty">Пока ничего не запланировано</string>
+
+  <!-- Filter chips -->
+  <string name="list_filter_all">Все</string>
+  <string name="list_filter_soon">Скоро</string>
+  <string name="list_filter_this_month">Этот месяц</string>
+  <string name="list_filter_past">Прошедшие</string>
+
+  <!-- Past section header -->
+  <string name="list_past_section_history_description">История</string>
+  <!-- "Прошедшие · N" — разделитель U+00B7 -->
+  <string name="list_past_section_title">Прошедшие · %d</string>
+  <string name="list_past_collapse">Свернуть</string>
+  <string name="list_past_expand">Развернуть</string>
+  <string name="list_past_toggle_description">Свернуть/развернуть прошедшие события</string>
+
+  <!-- Swipe-to-delete background -->
+  <string name="list_swipe_delete_label">Удалить</string>
+  <string name="list_swipe_delete_icon_description">Удалить событие</string>
+
+  <!-- Snackbar -->
+  <string name="list_snackbar_deleted">Удалено</string>
+  <string name="list_snackbar_undo">Отменить</string>
+
+  <!-- Global empty state -->
+  <string name="list_empty_heading">Создайте первое событие</string>
+  <string name="list_empty_body">Добавьте дату, которую ждёте — приложение посчитает остаток до секунды.</string>
+  <string name="list_empty_icon_description">Песочные часы</string>
+
+  <!-- Partial empty state (upcoming=0, past>0) -->
+  <string name="list_partial_empty_heading">Нет предстоящих событий</string>
+  <string name="list_partial_empty_body">Добавьте новое событие, чтобы начать обратный отсчёт.</string>
+
+  <!-- Error state -->
+  <string name="list_error_message">Не удалось загрузить события. Попробуйте ещё раз.</string>
+
+  <!-- FAB -->
+  <string name="list_fab_label">Новое событие</string>
+  <string name="list_fab_icon_description">Добавить событие</string>
+
+  <!-- Card icon accessibility -->
+  <string name="list_card_icon_description">Иконка %s</string>
+
+  <!-- More menu -->
+  <string name="list_menu_settings">Настройки</string>
+  <string name="list_menu_enable_notifications">Включить уведомления</string>
+</resources>
