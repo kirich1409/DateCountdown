@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -168,6 +169,8 @@ private fun CounterScreenContent(
     )
 
     is CounterState.Error -> CounterErrorContent(
+      cause = state.cause,
+      onBackClick = onBackClick,
       modifier = modifier,
     )
 
@@ -228,6 +231,11 @@ private fun UpcomingCounter(
     val useLightIcons = ColorUtils.calculateLuminance(heroArgb) <= 0.5
     SideEffect {
       val window = (view.context as? Activity)?.window ?: return@SideEffect
+      // window.statusBarColor / navigationBarColor are deprecated in API 35.
+      // Kept until the project migrates to a WindowInsetsController-only path; current
+      // edge-to-edge hero tinting requires window-color compat for API 29..34. The modern
+      // alternative (transparent bars + bar-controller alone) is an app-level decision
+      // that is out of scope for this feature screen.
       @Suppress("DEPRECATION")
       window.statusBarColor = heroArgb
       @Suppress("DEPRECATION")
@@ -320,6 +328,11 @@ private fun PastCounter(
     val useLightIcons = ColorUtils.calculateLuminance(heroArgb) <= 0.5
     SideEffect {
       val window = (view.context as? Activity)?.window ?: return@SideEffect
+      // window.statusBarColor / navigationBarColor are deprecated in API 35.
+      // Kept until the project migrates to a WindowInsetsController-only path; current
+      // edge-to-edge hero tinting requires window-color compat for API 29..34. The modern
+      // alternative (transparent bars + bar-controller alone) is an app-level decision
+      // that is out of scope for this feature screen.
       @Suppress("DEPRECATION")
       window.statusBarColor = heroArgb
       @Suppress("DEPRECATION")
@@ -764,8 +777,8 @@ private fun GlassRow(
         countdown.seconds to stringResource(R.string.counter_unit_seconds),
       )
 
-      // SECONDS: hidden — handled by early return above.
-      CountdownUnit.SECONDS -> emptyList()
+      // SECONDS: unreachable — early return above guarantees this branch is never entered.
+      else -> error("GlassRow: SECONDS should have been excluded by early return")
     }
 
     cells.forEach { (value, label) ->
@@ -827,7 +840,9 @@ private fun GlassCell(
 
 @Composable
 private fun CounterLoadingContent(modifier: Modifier = Modifier) {
-  Box(modifier = modifier.fillMaxSize())
+  Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    CircularProgressIndicator()
+  }
 }
 
 @Composable
@@ -856,16 +871,37 @@ private fun CounterNotFoundContent(
 }
 
 @Composable
-private fun CounterErrorContent(modifier: Modifier = Modifier) {
+private fun CounterErrorContent(
+  cause: Throwable,
+  onBackClick: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
   Box(
     modifier = modifier.fillMaxSize(),
     contentAlignment = Alignment.Center,
   ) {
-    Text(
-      text = stringResource(R.string.counter_error_message),
-      style = MaterialTheme.typography.bodyLarge,
-      color = MaterialTheme.colorScheme.error,
-    )
+    Column(
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+      Text(
+        text = stringResource(R.string.counter_error_message),
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.error,
+      )
+      val causeLabel = cause.message?.takeIf { it.isNotBlank() }
+        ?: cause::class.simpleName
+      if (causeLabel != null) {
+        Text(
+          text = causeLabel,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+        )
+      }
+      androidx.compose.material3.Button(onClick = onBackClick) {
+        Text(stringResource(R.string.counter_not_found_back))
+      }
+    }
   }
 }
 
