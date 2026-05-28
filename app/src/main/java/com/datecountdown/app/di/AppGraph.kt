@@ -1,11 +1,17 @@
 package com.datecountdown.app.di
 
 import android.app.Application
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.datecountdown.app.data.EventsRepositoryImpl
+import com.datecountdown.app.data.SettingsRepositoryImpl
 import com.datecountdown.app.data.local.AppDatabase
 import com.datecountdown.app.data.local.EventDao
 import com.datecountdown.app.domain.EventsRepository
+import com.datecountdown.app.domain.SettingsRepository
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
@@ -19,13 +25,14 @@ import dev.zacsweers.metro.SingleIn
  * [dev.zacsweers.metro.createGraphFactory]; its lifetime therefore matches the Activity.
  *
  * [AppDatabase] and [EventDao] are provided as singletons here — the database must not be
- * rebuilt per injection. [EventsRepository] is likewise scoped so all callers share the same
- * instance.
+ * rebuilt per injection. [EventsRepository] and [SettingsRepository] are likewise scoped so
+ * all callers share the same instance.
  *
  * Note: [AppDatabase], [EventDao], and [EventEntity] were all promoted from `internal` to public.
  * [EventDao]'s generated Room impl exposes [EventEntity] in its signatures, so Kotlin requires
- * [EventEntity] to also be public once [EventDao] is public. None of these types are part of
- * the intended public API of [:data] — they are implementation details exposed only to satisfy
+ * [EventEntity] to also be public once [EventDao] is public. [SettingsRepositoryImpl] is also
+ * public for the same cross-module Metro wiring reason. None of these types are part of the
+ * intended public API of [:data] — they are implementation details exposed only to satisfy
  * the Metro wiring in [:app].
  */
 @DependencyGraph(AppScope::class)
@@ -33,6 +40,9 @@ interface AppGraph {
 
   /** Accessor exposed so downstream components can receive [EventsRepository] by type. */
   val eventsRepository: EventsRepository
+
+  /** Accessor exposed so downstream components can receive [SettingsRepository] by type. */
+  val settingsRepository: SettingsRepository
 
   @DependencyGraph.Factory
   fun interface Factory {
@@ -55,4 +65,16 @@ interface AppGraph {
   @SingleIn(AppScope::class)
   @Provides
   fun provideEventsRepository(dao: EventDao): EventsRepository = EventsRepositoryImpl(dao)
+
+  @SingleIn(AppScope::class)
+  @Provides
+  fun provideDataStore(application: Application): DataStore<Preferences> =
+    PreferenceDataStoreFactory.create(
+      produceFile = { application.preferencesDataStoreFile("settings") },
+    )
+
+  @SingleIn(AppScope::class)
+  @Provides
+  fun provideSettingsRepository(dataStore: DataStore<Preferences>): SettingsRepository =
+    SettingsRepositoryImpl(dataStore)
 }

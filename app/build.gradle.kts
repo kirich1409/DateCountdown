@@ -53,6 +53,8 @@ dependencies {
   implementation(project(":data"))
   // Room runtime needed here to call Room.databaseBuilder in AppGraph
   implementation(libs.androidx.room.runtime)
+  // DataStore needed here to call PreferenceDataStoreFactory.create in AppGraph
+  implementation(libs.androidx.datastore.preferences)
 
   // Design system — theme, colors, typography
   implementation(project(":core:design"))
