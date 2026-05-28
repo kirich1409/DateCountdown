@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Top App Bar -->
+  <string name="list_title">Countdown</string>
+  <string name="list_menu_description">Menu</string>
+  <string name="list_search_description">Search</string>
+  <string name="list_more_description">More</string>
+
+  <!-- Subtitle plurals: "N events ahead" / "Пока ничего не запланировано" -->
+  <plurals name="list_subtitle_events_ahead">
+    <item quantity="one">%d event ahead</item>
+    <item quantity="other">%d events ahead</item>
+  </plurals>
+  <string name="list_subtitle_empty">Nothing planned yet</string>
+
+  <!-- Filter chips -->
+  <string name="list_filter_all">All</string>
+  <string name="list_filter_soon">Soon</string>
+  <string name="list_filter_this_month">This month</string>
+  <string name="list_filter_past">Past</string>
+
+  <!-- Past section header -->
+  <string name="list_past_section_history_description">History</string>
+  <!-- "Прошедшие · N" header — the bullet separator is a middle dot (U+00B7) -->
+  <string name="list_past_section_title">Past · %d</string>
+  <string name="list_past_collapse">Collapse</string>
+  <string name="list_past_expand">Expand</string>
+  <string name="list_past_toggle_description">Toggle past events section</string>
+
+  <!-- Swipe-to-delete background -->
+  <string name="list_swipe_delete_label">Delete</string>
+  <string name="list_swipe_delete_icon_description">Delete event</string>
+
+  <!-- Snackbar -->
+  <string name="list_snackbar_deleted">Deleted</string>
+  <string name="list_snackbar_undo">Undo</string>
+
+  <!-- Global empty state -->
+  <string name="list_empty_heading">Create your first event</string>
+  <string name="list_empty_body">Add a date you\'re looking forward to — the app will count down to the second.</string>
+  <string name="list_empty_icon_description">Hourglass</string>
+
+  <!-- Partial empty state (upcoming=0, past>0) -->
+  <string name="list_partial_empty_heading">No upcoming events</string>
+  <string name="list_partial_empty_body">Add a new event to start counting down.</string>
+
+  <!-- Error state -->
+  <string name="list_error_message">Failed to load events. Please try again.</string>
+
+  <!-- FAB -->
+  <string name="list_fab_label">New event</string>
+  <string name="list_fab_icon_description">Add event</string>
+
+  <!-- Card icon accessibility -->
+  <string name="list_card_icon_description">%s icon</string>
+
+  <!-- More menu -->
+  <string name="list_menu_settings">Settings</string>
+  <string name="list_menu_enable_notifications">Enable notifications</string>
+</resources>
