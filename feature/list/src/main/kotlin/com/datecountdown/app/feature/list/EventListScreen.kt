@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -824,7 +825,7 @@ private fun ListFab(
  * [RadioButton] has `onClick = null` so the row is the single interactive element.
  */
 @Composable
-internal fun SettingsThemeDialog(
+private fun SettingsThemeDialog(
   currentMode: ThemeMode,
   onModeSelected: (ThemeMode) -> Unit,
   onDismiss: () -> Unit,
@@ -872,6 +873,7 @@ private fun ThemeModeRow(
   Row(
     modifier = modifier
       .fillMaxWidth()
+      .heightIn(min = 48.dp)
       .selectable(
         selected = selected,
         onClick = onClick,
