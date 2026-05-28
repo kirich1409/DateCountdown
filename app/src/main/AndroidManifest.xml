@@ -6,6 +6,8 @@
          SCHEDULE_EXACT_ALARM may be denied by the user on 31-32; denial handling is #48's scope. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Required to receive ACTION_BOOT_COMPLETED for alarm restoration (AC-NT-9). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:allowBackup="false"
@@ -33,6 +35,19 @@
         <receiver
             android:name=".notifications.AlarmReceiver"
             android:exported="false" />
+
+        <!-- BootReceiver: reschedules all upcoming event alarms after device reboot (AC-NT-9/10).
+             exported=true — the system must be able to deliver ACTION_BOOT_COMPLETED.
+             android:permission restricts delivery to the system only (defense-in-depth).
+             Intent action is also validated inside onReceive. -->
+        <receiver
+            android:name=".notifications.BootReceiver"
+            android:exported="true"
+            android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
+          <intent-filter>
+            <action android:name="android.intent.action.BOOT_COMPLETED" />
+          </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
