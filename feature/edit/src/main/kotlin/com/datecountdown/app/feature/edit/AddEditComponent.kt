@@ -8,6 +8,7 @@ import com.arkivanov.mvikotlin.core.rx.observer
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.datecountdown.app.domain.EventColor
 import com.datecountdown.app.domain.EventIcon
+import com.datecountdown.app.domain.ExactAlarmPermissionChecker
 import com.datecountdown.app.domain.usecase.GetEventUseCase
 import com.datecountdown.app.domain.usecase.SaveEventUseCase
 import kotlinx.datetime.Clock
@@ -79,6 +80,23 @@ interface AddEditComponent {
   fun onDismissConfirmCancel()
 
   /**
+   * User confirmed they want to save without scheduling a notification (AC-NT-13).
+   *
+   * Called from the "Save without notification" button in the exact-alarm-denied dialog.
+   * Triggers [SaveEventUseCase] with scheduling disabled; emits [Output.Saved] on success.
+   */
+  fun onSaveWithoutNotification()
+
+  /**
+   * User closed the "exact alarms disabled" dialog without choosing an action (AC-NT-13).
+   *
+   * Clears [AddEditState.Form.exactAlarmDenied]; the sheet remains open. The user must tap
+   * Save again after granting permission (via the dialog's "Open settings" button) or invoke
+   * [onSaveWithoutNotification].
+   */
+  fun onExactAlarmDialogDismiss()
+
+  /**
    * Navigation outputs from the edit sheet.
    *
    * Translated to navigation actions by [com.datecountdown.app.navigation.RootComponent].
@@ -112,6 +130,7 @@ class DefaultAddEditComponent(
   storeFactory: StoreFactory,
   getEvent: GetEventUseCase,
   saveEvent: SaveEventUseCase,
+  exactAlarmChecker: ExactAlarmPermissionChecker,
   clock: Clock = Clock.System,
   private val output: (AddEditComponent.Output) -> Unit,
 ) : AddEditComponent, ComponentContext by componentContext {
@@ -128,6 +147,7 @@ class DefaultAddEditComponent(
         eventId = eventId,
         getEvent = getEvent,
         saveEvent = saveEvent,
+        exactAlarmChecker = exactAlarmChecker,
         clock = clock,
       ).create()
 
@@ -181,5 +201,13 @@ class DefaultAddEditComponent(
 
   override fun onDismissConfirmCancel() {
     store.accept(AddEditStore.Intent.CancelDiscardConfirmation)
+  }
+
+  override fun onSaveWithoutNotification() {
+    store.accept(AddEditStore.Intent.ConfirmSaveWithoutNotification)
+  }
+
+  override fun onExactAlarmDialogDismiss() {
+    store.accept(AddEditStore.Intent.DismissExactAlarmDialog)
   }
 }

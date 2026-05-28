@@ -9,6 +9,7 @@ import com.datecountdown.app.domain.Event
 import com.datecountdown.app.domain.EventColor
 import com.datecountdown.app.domain.EventIcon
 import com.datecountdown.app.domain.EventId
+import com.datecountdown.app.domain.ExactAlarmPermissionChecker
 import com.datecountdown.app.domain.usecase.EventDraft
 import com.datecountdown.app.domain.usecase.GetEventUseCase
 import com.datecountdown.app.domain.usecase.SaveEventUseCase
@@ -82,6 +83,22 @@ internal interface AddEditStore : Store<AddEditStore.Intent, AddEditState, AddEd
      * Clears [AddEditState.Form.showDiscardConfirmation]; no navigation occurs.
      */
     data object CancelDiscardConfirmation : Intent
+
+    /**
+     * User confirmed they want to save without scheduling a notification (AC-NT-13).
+     *
+     * Triggers [SaveEventUseCase] with `scheduleNotification = false`. On success emits
+     * [Label.Saved] and clears [AddEditState.Form.exactAlarmDenied].
+     */
+    data object ConfirmSaveWithoutNotification : Intent
+
+    /**
+     * User closed the "exact alarms disabled" dialog without choosing an action (AC-NT-13).
+     *
+     * Clears [AddEditState.Form.exactAlarmDenied]; the save is NOT performed. The user must
+     * tap Save again after granting permission (or use [ConfirmSaveWithoutNotification]).
+     */
+    data object DismissExactAlarmDialog : Intent
   }
 
   sealed interface Label {
@@ -127,6 +144,12 @@ private sealed interface Message {
 
   /** Hides the discard-confirmation dialog ([AddEditState.Form.showDiscardConfirmation] = false). */
   data object HideDiscardConfirmation : Message
+
+  /** Reveals the exact-alarm-denied dialog ([AddEditState.Form.exactAlarmDenied] = true). */
+  data object ExactAlarmDenied : Message
+
+  /** Hides the exact-alarm-denied dialog ([AddEditState.Form.exactAlarmDenied] = false). */
+  data object HideExactAlarmDialog : Message
 }
 
 // ── Default form values ─────────────────────────────────────────────────────────────────────────────
@@ -136,11 +159,13 @@ private val DEFAULT_ICON = EventIcon.CELEBRATION
 
 // ── Factory ────────────────────────────────────────────────────────────────────────────────────────
 
+@Suppress("LongParameterList")
 internal class AddEditStoreFactory(
   private val storeFactory: StoreFactory,
   private val eventId: String?,
   private val getEvent: GetEventUseCase,
   private val saveEvent: SaveEventUseCase,
+  private val exactAlarmChecker: ExactAlarmPermissionChecker,
   private val clock: Clock = Clock.System,
   private val mainContext: CoroutineContext = Dispatchers.Main,
 ) {
@@ -156,6 +181,7 @@ internal class AddEditStoreFactory(
             eventId = eventId,
             getEvent = getEvent,
             saveEvent = saveEvent,
+            exactAlarmChecker = exactAlarmChecker,
             clock = clock,
             mainContext = mainContext,
           )
@@ -170,6 +196,7 @@ private class Executor(
   private val eventId: String?,
   private val getEvent: GetEventUseCase,
   private val saveEvent: SaveEventUseCase,
+  private val exactAlarmChecker: ExactAlarmPermissionChecker,
   private val clock: Clock,
   mainContext: CoroutineContext,
 ) : CoroutineExecutor<AddEditStore.Intent, Unit, AddEditState, Message, AddEditStore.Label>(
@@ -194,13 +221,15 @@ private class Executor(
       )
       is AddEditStore.Intent.UpdateColor -> dispatch(Message.ColorUpdated(color = intent.color))
       is AddEditStore.Intent.UpdateIcon -> dispatch(Message.IconUpdated(icon = intent.icon))
-      AddEditStore.Intent.Save -> save()
+      AddEditStore.Intent.Save -> save(scheduleNotification = true)
       AddEditStore.Intent.DiscardAndDismiss -> {
         dispatch(Message.HideDiscardConfirmation)
         publish(AddEditStore.Label.Dismissed)
       }
       AddEditStore.Intent.RequestDismiss -> requestDismiss()
       AddEditStore.Intent.CancelDiscardConfirmation -> dispatch(Message.HideDiscardConfirmation)
+      AddEditStore.Intent.ConfirmSaveWithoutNotification -> save(scheduleNotification = false)
+      AddEditStore.Intent.DismissExactAlarmDialog -> dispatch(Message.HideExactAlarmDialog)
     }
   }
 
@@ -239,10 +268,20 @@ private class Executor(
   }
 
   @Suppress("TooGenericExceptionCaught")
-  private fun save() {
+  private fun save(scheduleNotification: Boolean) {
     val currentState = state()
-    if (currentState !is AddEditState.Form) return
-    if (currentState.isSaving) return
+    if (currentState !is AddEditState.Form || currentState.isSaving) return
+
+    // Pre-check exact-alarm permission only when we intend to schedule (upcoming event +
+    // scheduleNotification flag). Past events skip the check — no alarm will be set.
+    val alarmDenied = scheduleNotification
+      && currentState.targetDateTime > clock.now()
+      && !exactAlarmChecker.canScheduleExactAlarms()
+
+    if (alarmDenied) {
+      dispatch(Message.ExactAlarmDenied)
+      return
+    }
 
     dispatch(Message.SaveStarted)
 
@@ -255,7 +294,7 @@ private class Executor(
           color = currentState.color,
           icon = currentState.icon,
         )
-        saveEvent(draft)
+        saveEvent(draft = draft, scheduleNotification = scheduleNotification)
         dispatch(Message.SaveSucceeded)
         publish(AddEditStore.Label.Saved)
       } catch (e: CancellationException) {
@@ -301,6 +340,8 @@ private object AddEditReducer : Reducer<AddEditState, Message> {
 
       Message.ShowDiscardConfirmation -> asForm { copy(showDiscardConfirmation = true) }
       Message.HideDiscardConfirmation -> asForm { copy(showDiscardConfirmation = false) }
+      Message.ExactAlarmDenied -> asForm { copy(exactAlarmDenied = true) }
+      Message.HideExactAlarmDialog -> asForm { copy(exactAlarmDenied = false) }
     }
 
   private fun AddEditState.reduceBootstrap(msg: Message): AddEditState =
@@ -337,8 +378,8 @@ private object AddEditReducer : Reducer<AddEditState, Message> {
 
   private fun AddEditState.reduceSave(msg: Message): AddEditState =
     when (msg) {
-      Message.SaveStarted -> asForm { copy(isSaving = true, saveError = null) }
-      Message.SaveSucceeded -> asForm { copy(isSaving = false, saveError = null) }
+      Message.SaveStarted -> asForm { copy(isSaving = true, saveError = null, exactAlarmDenied = false) }
+      Message.SaveSucceeded -> asForm { copy(isSaving = false, saveError = null, exactAlarmDenied = false) }
       is Message.SaveFailed -> asForm { copy(isSaving = false, saveError = msg.cause) }
       else -> this
     }

@@ -50,6 +50,16 @@ sealed interface AddEditState {
      * [AddEditStore.Intent.CancelDiscardConfirmation].
      */
     val showDiscardConfirmation: Boolean = false,
+    /**
+     * True while the "exact alarms disabled" dialog should be shown (AC-NT-13).
+     *
+     * Set to true when [AddEditStore.Intent.Save] is received but
+     * [ExactAlarmPermissionChecker.canScheduleExactAlarms] returns false for an upcoming event.
+     * Cleared by [AddEditStore.Intent.ConfirmSaveWithoutNotification] (user saves anyway) and
+     * [AddEditStore.Intent.DismissExactAlarmDialog] (user closes without choosing).
+     * The Save action is NOT performed until one of these resolution intents arrives.
+     */
+    val exactAlarmDenied: Boolean = false,
   ) : AddEditState
 
   /**

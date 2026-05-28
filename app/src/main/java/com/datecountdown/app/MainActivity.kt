@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
       pastProcessor = pastProcessor,
       notificationScheduler = graph.notificationScheduler,
       settings = graph.settingsRepository,
+      exactAlarmChecker = graph.exactAlarmPermissionChecker,
     )
 
     enableEdgeToEdge()

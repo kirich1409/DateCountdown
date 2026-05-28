@@ -8,6 +8,7 @@ import com.datecountdown.app.domain.EventColor
 import com.datecountdown.app.domain.EventIcon
 import com.datecountdown.app.domain.EventId
 import com.datecountdown.app.domain.EventsRepository
+import com.datecountdown.app.domain.ExactAlarmPermissionChecker
 import com.datecountdown.app.domain.NotificationScheduler
 import com.datecountdown.app.domain.usecase.GetEventUseCase
 import com.datecountdown.app.domain.usecase.SaveEventUseCase
@@ -73,6 +74,7 @@ class AddEditStoreTest {
     eventId: String? = null,
     repo: FakeEventsRepository = FakeEventsRepository(),
     notificationScheduler: NotificationScheduler = NoOpNotificationScheduler(),
+    canScheduleExactAlarms: Boolean = true,
   ): AddEditStore = AddEditStoreFactory(
     storeFactory = DefaultStoreFactory(),
     eventId = eventId,
@@ -82,6 +84,7 @@ class AddEditStoreTest {
       scheduler = notificationScheduler,
       clock = fixedClock,
     ),
+    exactAlarmChecker = FakeExactAlarmPermissionChecker(canSchedule = canScheduleExactAlarms),
     clock = fixedClock,
     mainContext = testDispatcher,
   ).create()
@@ -398,6 +401,195 @@ class AddEditStoreTest {
 
     store.dispose()
   }
+
+  // ── Exact-alarm permission flow (AC-NT-13) ─────────────────────────────────────────────────────
+
+  @Test
+  fun `Save — canScheduleExactAlarms true — calls SaveEventUseCase and emits Saved label`() = runTest {
+    val repo = FakeEventsRepository()
+    val store = createStore(
+      eventId = null,
+      repo = repo,
+      canScheduleExactAlarms = true,
+    )
+
+    store.accept(AddEditStore.Intent.UpdateTitle(title = "Upcoming event"))
+    // Future date — permission check is relevant only for upcoming events.
+    store.accept(AddEditStore.Intent.UpdateTargetDateTime(
+      dateTime = Instant.parse("2027-01-01T00:00:00Z"),
+    ))
+
+    store.labels.test {
+      store.accept(AddEditStore.Intent.Save)
+
+      val label = awaitItem()
+      assertEquals(AddEditStore.Label.Saved, label)
+
+      cancelAndIgnoreRemainingEvents()
+    }
+
+    // State should reflect successful save (not stuck in exactAlarmDenied).
+    val form = store.state as? AddEditState.Form
+    assertTrue("exactAlarmDenied should be false after successful save", form?.exactAlarmDenied == false)
+
+    store.dispose()
+  }
+
+  @Test
+  fun `Save — canScheduleExactAlarms false for upcoming event — shows dialog, SaveEventUseCase not called`() = runTest {
+    val scheduler = TrackingNotificationScheduler()
+    val store = createStore(
+      eventId = null,
+      notificationScheduler = scheduler,
+      canScheduleExactAlarms = false,
+    )
+
+    store.accept(AddEditStore.Intent.UpdateTitle(title = "Future event"))
+    store.accept(AddEditStore.Intent.UpdateTargetDateTime(
+      dateTime = Instant.parse("2027-01-01T00:00:00Z"),
+    ))
+
+    store.labels.test {
+      store.accept(AddEditStore.Intent.Save)
+      // Dialog shown — no label, no save.
+      expectNoEvents()
+    }
+
+    val form = store.state as? AddEditState.Form
+    assertTrue("exactAlarmDenied should be true when permission denied", form?.exactAlarmDenied == true)
+    assertFalse("scheduler.scheduleCalled should be false", scheduler.scheduleCalled)
+
+    store.dispose()
+  }
+
+  @Test
+  fun `Save — canScheduleExactAlarms false but past event — save proceeds normally`() = runTest {
+    val repo = FakeEventsRepository()
+    val store = createStore(
+      eventId = null,
+      repo = repo,
+      canScheduleExactAlarms = false,
+    )
+
+    store.accept(AddEditStore.Intent.UpdateTitle(title = "Past event"))
+    // Past date — permission check is skipped; no alarm will be scheduled.
+    store.accept(AddEditStore.Intent.UpdateTargetDateTime(
+      dateTime = Instant.parse("2020-01-01T00:00:00Z"),
+    ))
+
+    store.labels.test {
+      store.accept(AddEditStore.Intent.Save)
+
+      val label = awaitItem()
+      assertEquals(AddEditStore.Label.Saved, label)
+
+      cancelAndIgnoreRemainingEvents()
+    }
+
+    val form = store.state as? AddEditState.Form
+    assertTrue("exactAlarmDenied should be false for past events", form?.exactAlarmDenied == false)
+
+    store.dispose()
+  }
+
+  @Test
+  fun `ConfirmSaveWithoutNotification — saves with scheduleNotification false and emits Saved`() = runTest {
+    val repo = FakeEventsRepository()
+    val scheduler = TrackingNotificationScheduler()
+    val store = createStore(
+      eventId = null,
+      repo = repo,
+      notificationScheduler = scheduler,
+      canScheduleExactAlarms = false,
+    )
+
+    store.accept(AddEditStore.Intent.UpdateTitle(title = "Future event"))
+    store.accept(AddEditStore.Intent.UpdateTargetDateTime(
+      dateTime = Instant.parse("2027-01-01T00:00:00Z"),
+    ))
+    // Trigger the denied dialog state.
+    store.accept(AddEditStore.Intent.Save)
+    assertTrue(
+      "exactAlarmDenied should be true before confirming save without notification",
+      (store.state as AddEditState.Form).exactAlarmDenied,
+    )
+
+    store.labels.test {
+      store.accept(AddEditStore.Intent.ConfirmSaveWithoutNotification)
+
+      val label = awaitItem()
+      assertEquals(AddEditStore.Label.Saved, label)
+
+      cancelAndIgnoreRemainingEvents()
+    }
+
+    // Alarm should not have been scheduled (scheduleNotification = false).
+    assertFalse("schedule should not be called when saving without notification", scheduler.scheduleCalled)
+
+    store.dispose()
+  }
+
+  @Test
+  fun `DismissExactAlarmDialog — clears exactAlarmDenied without saving`() = runTest {
+    val scheduler = TrackingNotificationScheduler()
+    val store = createStore(
+      eventId = null,
+      notificationScheduler = scheduler,
+      canScheduleExactAlarms = false,
+    )
+
+    store.accept(AddEditStore.Intent.UpdateTitle(title = "Future event"))
+    store.accept(AddEditStore.Intent.UpdateTargetDateTime(
+      dateTime = Instant.parse("2027-01-01T00:00:00Z"),
+    ))
+    store.accept(AddEditStore.Intent.Save)
+    assertTrue(
+      "exactAlarmDenied should be true after Save with denied permission",
+      (store.state as AddEditState.Form).exactAlarmDenied,
+    )
+
+    store.labels.test {
+      store.accept(AddEditStore.Intent.DismissExactAlarmDialog)
+      // User closed dialog — no save, no label.
+      expectNoEvents()
+    }
+
+    val form = store.state as AddEditState.Form
+    assertFalse("exactAlarmDenied should be false after dismiss", form.exactAlarmDenied)
+    assertFalse("scheduler.scheduleCalled should be false after dismiss", scheduler.scheduleCalled)
+
+    store.dispose()
+  }
+
+  @Test
+  fun `ConfirmSaveWithoutNotification — save failure clears exactAlarmDenied and sets saveError`() = runTest {
+    val saveError = RuntimeException("DB write failed")
+    val repo = FakeEventsRepository(throwOnSave = saveError)
+    val store = createStore(
+      eventId = null,
+      repo = repo,
+      canScheduleExactAlarms = false,
+    )
+
+    store.accept(AddEditStore.Intent.UpdateTitle(title = "Future event"))
+    store.accept(AddEditStore.Intent.UpdateTargetDateTime(
+      dateTime = Instant.parse("2027-01-01T00:00:00Z"),
+    ))
+    // Trigger the denied dialog state.
+    store.accept(AddEditStore.Intent.Save)
+    assertTrue(
+      "exactAlarmDenied should be true before confirming save without notification",
+      (store.state as AddEditState.Form).exactAlarmDenied,
+    )
+
+    store.accept(AddEditStore.Intent.ConfirmSaveWithoutNotification)
+
+    val form = store.state as AddEditState.Form
+    assertFalse("exactAlarmDenied should be false after failed save", form.exactAlarmDenied)
+    assertTrue("saveError should be set after failed save", form.saveError != null)
+
+    store.dispose()
+  }
 }
 
 // ── Test fakes ────────────────────────────────────────────────────────────────────────────────────
@@ -406,6 +598,7 @@ class AddEditStoreTest {
 private class FakeEventsRepository(
   private vararg val events: Event,
   private val throwOnGet: Exception? = null,
+  private val throwOnSave: Exception? = null,
 ) : EventsRepository {
 
   private val stored = mutableListOf(*events)
@@ -416,10 +609,12 @@ private class FakeEventsRepository(
   }
 
   override suspend fun add(event: Event) {
+    if (throwOnSave != null) throw throwOnSave
     stored.add(event)
   }
 
   override suspend fun update(event: Event) {
+    if (throwOnSave != null) throw throwOnSave
     val index = stored.indexOfFirst { it.id == event.id }
     if (index >= 0) stored[index] = event else stored.add(event)
   }
@@ -440,4 +635,21 @@ private class NoOpNotificationScheduler : NotificationScheduler {
 /** Fixed-time [Clock] — deterministic for tests. */
 private fun Clock.Companion.fixed(now: Instant): Clock = object : Clock {
   override fun now(): Instant = now
+}
+
+/** Fake [ExactAlarmPermissionChecker] with controllable return value. */
+private class FakeExactAlarmPermissionChecker(private val canSchedule: Boolean) : ExactAlarmPermissionChecker {
+  override fun canScheduleExactAlarms(): Boolean = canSchedule
+}
+
+/** [NotificationScheduler] that tracks whether [schedule] was ever called. */
+private class TrackingNotificationScheduler : NotificationScheduler {
+  var scheduleCalled = false
+    private set
+
+  override suspend fun schedule(event: Event) {
+    scheduleCalled = true
+  }
+
+  override suspend fun cancel(id: EventId) = Unit
 }
