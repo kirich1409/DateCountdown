@@ -134,7 +134,7 @@ private fun BoxScope.CounterBlobDecorations(
  * [CounterScreenContent].
  */
 @Composable
-internal fun CounterScreen(
+fun CounterScreen(
   component: CounterComponent,
   modifier: Modifier = Modifier,
 ) {
