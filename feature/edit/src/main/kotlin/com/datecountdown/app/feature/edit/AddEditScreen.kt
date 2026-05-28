@@ -3,6 +3,7 @@
 package com.datecountdown.app.feature.edit
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,7 +25,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -33,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -179,21 +184,6 @@ private fun AddEditFormContent(
   // Intermediate date (millis) held between DatePicker confirm and TimePicker confirm
   var pendingDateMillis by rememberSaveable { mutableStateOf<Long?>(null) }
 
-  // Derive initial picker values from the current targetDateTime
-  val localNow = remember(state.targetDateTime) {
-    state.targetDateTime.toLocalDateTime(TimeZone.currentSystemDefault())
-  }
-
-  // Re-keyed on targetDateTime so stale state is not reused after an external state update
-  val datePickerState = rememberDatePickerState(
-    initialSelectedDateMillis = state.targetDateTime.toEpochMilliseconds(),
-  )
-  val timePickerState = rememberTimePickerState(
-    initialHour = localNow.hour,
-    initialMinute = localNow.minute,
-    is24Hour = true,
-  )
-
   if (state.showDiscardConfirmation) {
     DiscardConfirmationDialog(
       onConfirm = component::onDiscardConfirmed,
@@ -202,6 +192,11 @@ private fun AddEditFormContent(
   }
 
   if (showDatePicker) {
+    // State scoped inside this conditional: each open starts with the current committed date,
+    // preventing uncommitted selections from leaking across open/cancel/reopen cycles (AC-AE-4).
+    val datePickerState = rememberDatePickerState(
+      initialSelectedDateMillis = state.targetDateTime.toEpochMilliseconds(),
+    )
     DatePickerDialog(
       onDismissRequest = { showDatePicker = false },
       confirmButton = {
@@ -226,6 +221,14 @@ private fun AddEditFormContent(
   }
 
   if (showTimePicker) {
+    // State scoped inside this conditional: each open starts with the current committed time,
+    // preventing uncommitted selections from leaking across open/cancel/reopen cycles (AC-AE-4).
+    val localNow = state.targetDateTime.toLocalDateTime(TimeZone.currentSystemDefault())
+    val timePickerState = rememberTimePickerState(
+      initialHour = localNow.hour,
+      initialMinute = localNow.minute,
+      is24Hour = true,
+    )
     AlertDialog(
       onDismissRequest = {
         pendingDateMillis = null
@@ -319,8 +322,6 @@ private fun AddEditFormContent(
       IconPickerSection(
         selected = state.icon,
         onSelect = component::onIconChange,
-        isDark = isDark,
-        selectedColor = state.color,
       )
 
       // Save error shown inline near the bottom (AC-AE-7)
@@ -375,22 +376,20 @@ private fun AddEditTopBar(
       }
     },
     actions = {
-      if (isSaving) {
-        CircularProgressIndicator(
-          modifier = Modifier
-            .size(24.dp)
-            .padding(end = 4.dp),
-          strokeWidth = 2.dp,
-        )
-      }
-      IconButton(
+      Button(
         onClick = onSave,
         enabled = saveEnabled,
+        modifier = Modifier.padding(end = 8.dp),
       ) {
-        Icon(
-          imageVector = Icons.Filled.Check,
-          contentDescription = stringResource(R.string.add_edit_save),
-        )
+        if (isSaving) {
+          CircularProgressIndicator(
+            modifier = Modifier.size(20.dp),
+            strokeWidth = 2.dp,
+            color = MaterialTheme.colorScheme.onPrimary,
+          )
+        } else {
+          Text(text = stringResource(R.string.add_edit_save))
+        }
       }
     },
   )
@@ -416,7 +415,7 @@ private fun EventPreviewCard(
   val designIcon = remember(icon.ordinal) {
     DesignEventIcon.entries[icon.ordinal]
   }
-  val dateLabel = remember(targetDateTime) { formatEventDate(targetDateTime) }
+  val dateLabel = remember(targetDateTime) { formatEventDateTimePreview(targetDateTime) }
   val displayTitle = title.ifBlank { "…" }
 
   Row(
@@ -424,10 +423,7 @@ private fun EventPreviewCard(
       .fillMaxWidth()
       .clip(RoundedCornerShape(16.dp))
       .background(palette.container)
-      .padding(16.dp)
-      .semantics(mergeDescendants = true) {
-        liveRegion = LiveRegionMode.Polite
-      },
+      .padding(16.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
@@ -487,24 +483,43 @@ private fun TitleField(
 // Date + time row (AC-AE-4)
 // ---------------------------------------------------------------------------
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DateTimeRow(
   targetDateTime: Instant,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val label = remember(targetDateTime) { formatEventDateTime(targetDateTime) }
-  OutlinedTextField(
-    value = label,
-    onValueChange = {},
-    label = { Text(text = stringResource(R.string.add_edit_datetime_label)) },
-    readOnly = true,
-    singleLine = true,
-    modifier = modifier
-      .fillMaxWidth()
-      .clickable(role = Role.Button, onClick = onClick),
-    enabled = false,
-  )
+  val formattedDateTime = remember(targetDateTime) { formatEventDateTime(targetDateTime) }
+  Surface(
+    onClick = onClick,
+    shape = OutlinedTextFieldDefaults.shape,
+    border = BorderStroke(width = 1.dp, color = MaterialTheme.colorScheme.outline),
+    modifier = modifier.fillMaxWidth(),
+  ) {
+    Row(
+      modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+          text = stringResource(R.string.add_edit_datetime_label),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+          text = formattedDateTime,
+          style = MaterialTheme.typography.bodyLarge,
+        )
+      }
+      Icon(
+        imageVector = Icons.Filled.DateRange,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -518,24 +533,37 @@ private fun ColorPickerSection(
   isDark: Boolean,
   modifier: Modifier = Modifier,
 ) {
+  val colorNames = stringArrayResource(R.array.color_names)
+  val colors = EventColor.entries
+  // Layout: 7 swatches in first row + 2 in second row (matches эталон screenshot)
+  val firstRowColors = colors.take(7)
+  val secondRowColors = colors.drop(7)
+
   Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Text(
       text = stringResource(R.string.add_edit_color_picker_label),
       style = MaterialTheme.typography.labelLarge,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    Row(
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
-      modifier = Modifier.fillMaxWidth(),
-    ) {
-      EventColor.entries.forEach { color ->
-        val isSelected = color == selected
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      firstRowColors.forEach { color ->
         ColorSwatch(
           color = color,
-          isSelected = isSelected,
+          colorName = colorNames[color.ordinal],
+          isSelected = color == selected,
           isDark = isDark,
           onClick = { onSelect(color) },
-          modifier = Modifier.weight(1f),
+        )
+      }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      secondRowColors.forEach { color ->
+        ColorSwatch(
+          color = color,
+          colorName = colorNames[color.ordinal],
+          isSelected = color == selected,
+          isDark = isDark,
+          onClick = { onSelect(color) },
         )
       }
     }
@@ -546,6 +574,7 @@ private fun ColorPickerSection(
 @Composable
 private fun ColorSwatch(
   color: EventColor,
+  colorName: String,
   isSelected: Boolean,
   isDark: Boolean,
   onClick: () -> Unit,
@@ -554,30 +583,17 @@ private fun ColorSwatch(
   val palette = remember(color.ordinal, isDark) {
     eventPaletteByIndex(index = color.ordinal, dark = isDark)
   }
-  val colorName = color.name.lowercase().replaceFirstChar { it.uppercase() }
   val a11yDesc = if (isSelected) {
     stringResource(R.string.add_edit_color_selected, colorName)
   } else {
     stringResource(R.string.add_edit_color_not_selected, colorName)
   }
-  val shape = if (isSelected) RoundedCornerShape(8.dp) else CircleShape
+  val swatchShape = if (isSelected) RoundedCornerShape(8.dp) else CircleShape
 
+  // 48dp touch target wrapping 40dp visual swatch (AC-AE-5)
   Box(
     modifier = modifier
-      .size(32.dp)
-      .clip(shape)
-      .background(palette.hero)
-      .then(
-        if (isSelected) {
-          Modifier.border(
-            width = 2.dp,
-            color = MaterialTheme.colorScheme.onSurface,
-            shape = shape,
-          )
-        } else {
-          Modifier
-        },
-      )
+      .size(48.dp)
       .clickable(
         role = Role.RadioButton,
         onClickLabel = a11yDesc,
@@ -587,7 +603,36 @@ private fun ColorSwatch(
         selected = isSelected
         role = Role.RadioButton
       },
-  )
+    contentAlignment = Alignment.Center,
+  ) {
+    Box(
+      modifier = Modifier
+        .size(40.dp)
+        .clip(swatchShape)
+        .background(palette.hero)
+        .then(
+          if (isSelected) {
+            Modifier.border(
+              width = 2.dp,
+              color = MaterialTheme.colorScheme.onSurface,
+              shape = swatchShape,
+            )
+          } else {
+            Modifier
+          },
+        ),
+      contentAlignment = Alignment.Center,
+    ) {
+      if (isSelected) {
+        Icon(
+          imageVector = Icons.Filled.Check,
+          contentDescription = null,
+          tint = palette.onHero,
+          modifier = Modifier.size(20.dp),
+        )
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -598,22 +643,17 @@ private fun ColorSwatch(
 private fun IconPickerSection(
   selected: DomainEventIcon,
   onSelect: (DomainEventIcon) -> Unit,
-  isDark: Boolean,
-  selectedColor: EventColor,
   modifier: Modifier = Modifier,
 ) {
-  val palette = remember(selectedColor.ordinal, isDark) {
-    eventPaletteByIndex(index = selectedColor.ordinal, dark = isDark)
-  }
   Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Text(
       text = stringResource(R.string.add_edit_icon_picker_label),
       style = MaterialTheme.typography.labelLarge,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    // 4 columns × 4 rows = 16 icons
+    // 8 columns × 2 rows = 16 icons (AC-AE-6, matches эталон)
     val icons = DomainEventIcon.entries
-    val columnCount = 4
+    val columnCount = 8
     val rowCount = (icons.size + columnCount - 1) / columnCount
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
       repeat(rowCount) { row ->
@@ -625,7 +665,6 @@ private fun IconPickerSection(
               IconPickerCell(
                 domainIcon = domainIcon,
                 isSelected = domainIcon == selected,
-                palette = palette,
                 onClick = { onSelect(domainIcon) },
                 modifier = Modifier.weight(1f),
               )
@@ -640,12 +679,10 @@ private fun IconPickerSection(
   }
 }
 
-@Suppress("LongParameterList")
 @Composable
 private fun IconPickerCell(
   domainIcon: DomainEventIcon,
   isSelected: Boolean,
-  palette: com.datecountdown.app.core.design.theme.EventPalette,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -654,11 +691,17 @@ private fun IconPickerCell(
   }
   val a11yDesc = stringResource(R.string.add_edit_icon_a11y, designIcon.symbolName)
 
+  val cellShape = if (isSelected) RoundedCornerShape(12.dp) else CircleShape
+  val cellColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+  else MaterialTheme.colorScheme.surfaceVariant
+  val iconTint = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
+  else MaterialTheme.colorScheme.onSurfaceVariant
+
   Box(
     modifier = modifier
-      .size(52.dp)
-      .clip(BlobShape.Variant4)
-      .background(if (isSelected) palette.hero else MaterialTheme.colorScheme.surfaceVariant)
+      .size(48.dp)
+      .clip(cellShape)
+      .background(cellColor)
       .clickable(
         role = Role.RadioButton,
         onClickLabel = a11yDesc,
@@ -673,7 +716,7 @@ private fun IconPickerCell(
     EventSymbol(
       icon = designIcon,
       size = 24.sp,
-      tint = if (isSelected) palette.onHero else MaterialTheme.colorScheme.onSurfaceVariant,
+      tint = iconTint,
       contentDescription = null, // cell's merged clickable semantics carries a11y
     )
   }
@@ -709,13 +752,15 @@ private fun DiscardConfirmationDialog(
 // Date/time formatting helpers
 // ---------------------------------------------------------------------------
 
-private val dateFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.getDefault())
-private val dateTimeFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.getDefault())
+// Preview card: "27 мая 2026 · 12:00" — full month name, title-case, middle-dot separator (U+00B7)
+private val dateTimePreviewFormatter = DateTimeFormatter.ofPattern("dd MMMM yyyy · HH:mm", Locale.getDefault())
 
-private fun formatEventDate(instant: Instant): String =
-  dateFormatter
+// Date field: "27 мая 2026, 12:00" — full month name, title-case, comma separator (per эталон)
+private val dateTimeFormatter = DateTimeFormatter.ofPattern("dd MMMM yyyy, HH:mm", Locale.getDefault())
+
+private fun formatEventDateTimePreview(instant: Instant): String =
+  dateTimePreviewFormatter
     .format(instant.toLocalDateTime(TimeZone.currentSystemDefault()).toJavaLocalDateTime())
-    .uppercase(Locale.getDefault())
 
 private fun formatEventDateTime(instant: Instant): String =
   dateTimeFormatter
