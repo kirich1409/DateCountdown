@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -85,6 +86,32 @@ import kotlin.time.Duration.Companion.days
 private val dateChipFormatter: DateTimeFormatter =
   DateTimeFormatter.ofPattern("dd MMMM yyyy · HH:mm", Locale.getDefault())
 
+/**
+ * Two decorative blob shapes placed at the top-end and bottom-start corners of the hero background.
+ * Purely visual — excluded from the accessibility tree by being non-clickable, un-described Boxes.
+ */
+@Composable
+private fun BoxScope.CounterBlobDecorations(
+  palette: com.datecountdown.app.core.design.theme.EventPalette,
+) {
+  Box(
+    modifier = Modifier
+      .size(200.dp)
+      .offset(x = 120.dp, y = (-60).dp)
+      .align(Alignment.TopEnd)
+      .clip(BlobShape.Variant2)
+      .background(palette.container.copy(alpha = 0.3f)),
+  )
+  Box(
+    modifier = Modifier
+      .size(200.dp)
+      .offset(x = (-80).dp, y = 60.dp)
+      .align(Alignment.BottomStart)
+      .clip(BlobShape.Variant3)
+      .background(palette.container.copy(alpha = 0.2f)),
+  )
+}
+
 // ── Stateful entry point ──────────────────────────────────────────────────────────────────────────
 
 /**
@@ -125,7 +152,7 @@ internal fun CounterScreen(
  */
 @Suppress("LongParameterList", "LongMethod")
 @Composable
-internal fun CounterScreenContent(
+private fun CounterScreenContent(
   state: CounterState,
   onBackClick: () -> Unit,
   onEditClick: () -> Unit,
@@ -216,23 +243,7 @@ private fun UpcomingCounter(
       .fillMaxSize()
       .background(palette.hero),
   ) {
-    // Background blob decorations — purely decorative, excluded from accessibility tree.
-    Box(
-      modifier = Modifier
-        .size(200.dp)
-        .offset(x = 120.dp, y = (-60).dp)
-        .align(Alignment.TopEnd)
-        .clip(BlobShape.Variant2)
-        .background(palette.container.copy(alpha = 0.3f)),
-    )
-    Box(
-      modifier = Modifier
-        .size(200.dp)
-        .offset(x = (-80).dp, y = 60.dp)
-        .align(Alignment.BottomStart)
-        .clip(BlobShape.Variant3)
-        .background(palette.container.copy(alpha = 0.2f)),
-    )
+    CounterBlobDecorations(palette = palette)
 
     Scaffold(
       topBar = {
@@ -324,23 +335,7 @@ private fun PastCounter(
       .fillMaxSize()
       .background(palette.hero),
   ) {
-    // Decorative background blobs — excluded from accessibility tree.
-    Box(
-      modifier = Modifier
-        .size(200.dp)
-        .offset(x = 120.dp, y = (-60).dp)
-        .align(Alignment.TopEnd)
-        .clip(BlobShape.Variant2)
-        .background(palette.container.copy(alpha = 0.3f)),
-    )
-    Box(
-      modifier = Modifier
-        .size(200.dp)
-        .offset(x = (-80).dp, y = 60.dp)
-        .align(Alignment.BottomStart)
-        .clip(BlobShape.Variant3)
-        .background(palette.container.copy(alpha = 0.2f)),
-    )
+    CounterBlobDecorations(palette = palette)
 
     Scaffold(
       topBar = {
@@ -811,9 +806,9 @@ private fun GlassCell(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-      // AC-CL-9: leading-zero format "02", "08".
+      // AC-CL-9: leading-zero format "02", "08". Locale.ROOT ensures ASCII digits in all locales.
       Text(
-        text = String.format(Locale.getDefault(), "%02d", value),
+        text = String.format(Locale.ROOT, "%02d", value),
         style = MaterialTheme.typography.headlineLarge,
         color = onHeroColor,
         fontWeight = FontWeight.Bold,
