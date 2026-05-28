@@ -19,7 +19,7 @@ mvikotlin = "4.4.0"
 metro = "1.1.1"
 room = "2.8.4"
 datastore = "1.2.1"
-kotlinxDatetime = "0.6.2"
+kotlinxDatetime = "0.8.0"
 turbine = "1.2.1"
 
 [libraries]
