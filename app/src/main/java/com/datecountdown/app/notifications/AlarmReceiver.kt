@@ -66,8 +66,8 @@ class AlarmReceiver : BroadcastReceiver() {
   // Catching Exception broadly is intentional: this is a top-level safety net in a
   // BroadcastReceiver. Any unhandled exception here would crash the process silently
   // (the OS kills the receiver), so catching broadly + logging is the correct recovery.
-  // POST_NOTIFICATIONS permission check (#47) is deferred; on API 33+ without the permission
-  // the system silently drops the notification — this is intentional for this PR scope.
+  // POST_NOTIFICATIONS is declared in the manifest (#47); when the user has denied the
+  // permission, NotificationManagerCompat silently drops the notify() call — intentional for MVP.
   @Suppress("TooGenericExceptionCaught")
   @SuppressLint("MissingPermission", "NotificationPermission")
   override fun onReceive(context: Context, intent: Intent) {

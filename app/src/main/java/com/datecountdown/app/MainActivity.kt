@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
       // entries in the same order (SYSTEM=0, LIGHT=1, DARK=2), so ordinal mapping is stable.
       val designThemeMode = com.datecountdown.app.core.design.theme.ThemeMode.entries[domainThemeMode.ordinal]
       DateCountdownTheme(themeMode = designThemeMode) {
-        RootContent(root = root)
+        RootContent(root = root, settings = graph.settingsRepository)
       }
     }
   }
