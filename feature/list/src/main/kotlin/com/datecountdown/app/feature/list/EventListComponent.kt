@@ -9,6 +9,7 @@ import com.datecountdown.app.domain.Event
 import com.datecountdown.app.domain.EventId
 import com.datecountdown.app.domain.NotificationScheduler
 import com.datecountdown.app.domain.SettingsRepository
+import com.datecountdown.app.domain.ThemeMode
 import com.datecountdown.app.domain.usecase.DeleteEventUseCase
 import com.datecountdown.app.domain.usecase.GetEventsUseCase
 import kotlinx.datetime.Instant
@@ -38,8 +39,13 @@ data class PendingDelete(
  * they are not separate sealed variants.
  */
 sealed interface EventListState {
+  /** Current theme preference, surfaced from [SettingsRepository.themeMode] (AC-TH-10). */
+  val themeMode: ThemeMode
+
   /** Initial state while the first emission from the repository has not yet arrived. */
-  data object Loading : EventListState
+  data object Loading : EventListState {
+    override val themeMode: ThemeMode = ThemeMode.SYSTEM
+  }
 
   /**
    * Data is available. Both lists are already sorted:
@@ -56,10 +62,15 @@ sealed interface EventListState {
      * Only one pending delete is held at a time (AC-LS-10a).
      */
     val pendingDelete: PendingDelete?,
+    /** Current theme preference, surfaced from [SettingsRepository.themeMode] (AC-TH-10). */
+    override val themeMode: ThemeMode = ThemeMode.SYSTEM,
   ) : EventListState
 
   /** The events flow or settings emitted a terminal error. */
-  data class Error(val cause: Throwable) : EventListState
+  data class Error(
+    val cause: Throwable,
+    override val themeMode: ThemeMode = ThemeMode.SYSTEM,
+  ) : EventListState
 }
 
 // ── Component interface ────────────────────────────────────────────────────────────────────────────
@@ -102,6 +113,9 @@ interface EventListComponent {
 
   /** User tapped the "Past" section header — toggle the collapsed state (AC-LS-11). */
   fun onTogglePast()
+
+  /** User selected a theme mode in the settings dialog (AC-TH-10). */
+  fun onThemeModeChange(mode: ThemeMode)
 
   /**
    * Navigation outputs emitted by the list screen.
@@ -187,5 +201,9 @@ class DefaultEventListComponent(
 
   override fun onTogglePast() {
     store.accept(EventListStore.Intent.TogglePastSection)
+  }
+
+  override fun onThemeModeChange(mode: ThemeMode) {
+    store.accept(EventListStore.Intent.UpdateThemeMode(mode = mode))
   }
 }
