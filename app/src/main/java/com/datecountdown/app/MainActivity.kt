@@ -11,6 +11,8 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
 import com.datecountdown.app.core.design.theme.ThemeMode
 import com.datecountdown.app.di.AppGraph
+import com.datecountdown.app.domain.usecase.DeleteEventUseCase
+import com.datecountdown.app.domain.usecase.GetEventsUseCase
 import com.datecountdown.app.navigation.RootComponent
 import dev.zacsweers.metro.createGraphFactory
 
@@ -34,11 +36,24 @@ class MainActivity : ComponentActivity() {
 
     // Metro root graph — holds all app-scoped singletons (AppDatabase, EventDao, EventsRepository).
     // Application is passed through AppGraph.Factory so Room.databaseBuilder has a Context.
-    @Suppress("UnusedPrivateProperty")
     val graph: AppGraph = createGraphFactory<AppGraph.Factory>().create(application)
 
+    // Use cases constructed manually (no DI framework in feature modules — see CLAUDE.md).
+    val getEvents = GetEventsUseCase(repo = graph.eventsRepository)
+    val deleteEvent = DeleteEventUseCase(
+      repo = graph.eventsRepository,
+      scheduler = graph.notificationScheduler,
+    )
+
     // Decompose root component — binds navigation lifecycle to this Activity.
-    val root = RootComponent(componentContext = defaultComponentContext())
+    val root = RootComponent(
+      componentContext = defaultComponentContext(),
+      storeFactory = graph.storeFactory,
+      getEvents = getEvents,
+      deleteEvent = deleteEvent,
+      notificationScheduler = graph.notificationScheduler,
+      settings = graph.settingsRepository,
+    )
 
     enableEdgeToEdge()
     setContent {

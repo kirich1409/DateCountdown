@@ -56,6 +56,10 @@ dependencies {
   // DataStore needed here to call PreferenceDataStoreFactory.create in AppGraph
   implementation(libs.androidx.datastore.preferences)
 
+  // MVIKotlin — StoreFactory is provided in AppGraph; DefaultStoreFactory in mvikotlin-main
+  implementation(libs.mvikotlin)
+  implementation(libs.mvikotlin.main)
+
   // Design system — theme, colors, typography
   implementation(project(":core:design"))
 
