@@ -11,7 +11,10 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
 import com.datecountdown.app.core.design.theme.ThemeMode
 import com.datecountdown.app.di.AppGraph
+import com.datecountdown.app.domain.CountdownCalculator
+import com.datecountdown.app.domain.PastEventProcessor
 import com.datecountdown.app.domain.usecase.DeleteEventUseCase
+import com.datecountdown.app.domain.usecase.GetEventUseCase
 import com.datecountdown.app.domain.usecase.GetEventsUseCase
 import com.datecountdown.app.navigation.RootComponent
 import dev.zacsweers.metro.createGraphFactory
@@ -38,12 +41,15 @@ class MainActivity : ComponentActivity() {
     // Application is passed through AppGraph.Factory so Room.databaseBuilder has a Context.
     val graph: AppGraph = createGraphFactory<AppGraph.Factory>().create(application)
 
-    // Use cases constructed manually (no DI framework in feature modules — see CLAUDE.md).
+    // Use cases and domain helpers constructed manually (no DI framework in feature modules).
     val getEvents = GetEventsUseCase(repo = graph.eventsRepository)
     val deleteEvent = DeleteEventUseCase(
       repo = graph.eventsRepository,
       scheduler = graph.notificationScheduler,
     )
+    val getEvent = GetEventUseCase(repo = graph.eventsRepository)
+    val calculator = CountdownCalculator()
+    val pastProcessor = PastEventProcessor()
 
     // Decompose root component — binds navigation lifecycle to this Activity.
     val root = RootComponent(
@@ -51,6 +57,9 @@ class MainActivity : ComponentActivity() {
       storeFactory = graph.storeFactory,
       getEvents = getEvents,
       deleteEvent = deleteEvent,
+      getEvent = getEvent,
+      calculator = calculator,
+      pastProcessor = pastProcessor,
       notificationScheduler = graph.notificationScheduler,
       settings = graph.settingsRepository,
     )
