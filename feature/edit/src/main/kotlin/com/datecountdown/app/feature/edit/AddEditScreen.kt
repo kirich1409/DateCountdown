@@ -5,6 +5,7 @@ package com.datecountdown.app.feature.edit
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -88,6 +89,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toJavaLocalDateTime
 import kotlinx.datetime.toLocalDateTime
+
+private const val EXACT_ALARM_DIALOG_TAG = "ExactAlarmDialog"
 
 // ---------------------------------------------------------------------------
 // Stateful entry point
@@ -203,8 +206,9 @@ private fun AddEditFormContent(
           data = Uri.fromParts("package", context.packageName, null)
           addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        // Rare OEM forks may not handle this action — skip silently if so.
+        // Rare OEM forks may not handle this action — log the failure so it's visible on-device.
         runCatching { context.startActivity(intent) }
+          .onFailure { Log.w(EXACT_ALARM_DIALOG_TAG, "ACTION_REQUEST_SCHEDULE_EXACT_ALARM unhandled", it) }
         component.onExactAlarmDialogDismiss()
       },
       onSaveWithoutNotification = component::onSaveWithoutNotification,

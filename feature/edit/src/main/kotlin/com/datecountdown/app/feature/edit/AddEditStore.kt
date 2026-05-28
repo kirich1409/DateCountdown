@@ -378,7 +378,7 @@ private object AddEditReducer : Reducer<AddEditState, Message> {
 
   private fun AddEditState.reduceSave(msg: Message): AddEditState =
     when (msg) {
-      Message.SaveStarted -> asForm { copy(isSaving = true, saveError = null) }
+      Message.SaveStarted -> asForm { copy(isSaving = true, saveError = null, exactAlarmDenied = false) }
       Message.SaveSucceeded -> asForm { copy(isSaving = false, saveError = null, exactAlarmDenied = false) }
       is Message.SaveFailed -> asForm { copy(isSaving = false, saveError = msg.cause) }
       else -> this

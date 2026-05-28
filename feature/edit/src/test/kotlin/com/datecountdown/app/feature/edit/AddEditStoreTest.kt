@@ -560,6 +560,36 @@ class AddEditStoreTest {
 
     store.dispose()
   }
+
+  @Test
+  fun `ConfirmSaveWithoutNotification — save failure clears exactAlarmDenied and sets saveError`() = runTest {
+    val saveError = RuntimeException("DB write failed")
+    val repo = FakeEventsRepository(throwOnSave = saveError)
+    val store = createStore(
+      eventId = null,
+      repo = repo,
+      canScheduleExactAlarms = false,
+    )
+
+    store.accept(AddEditStore.Intent.UpdateTitle(title = "Future event"))
+    store.accept(AddEditStore.Intent.UpdateTargetDateTime(
+      dateTime = Instant.parse("2027-01-01T00:00:00Z"),
+    ))
+    // Trigger the denied dialog state.
+    store.accept(AddEditStore.Intent.Save)
+    assertTrue(
+      "exactAlarmDenied should be true before confirming save without notification",
+      (store.state as AddEditState.Form).exactAlarmDenied,
+    )
+
+    store.accept(AddEditStore.Intent.ConfirmSaveWithoutNotification)
+
+    val form = store.state as AddEditState.Form
+    assertFalse("exactAlarmDenied should be false after failed save", form.exactAlarmDenied)
+    assertTrue("saveError should be set after failed save", form.saveError != null)
+
+    store.dispose()
+  }
 }
 
 // ── Test fakes ────────────────────────────────────────────────────────────────────────────────────
@@ -568,6 +598,7 @@ class AddEditStoreTest {
 private class FakeEventsRepository(
   private vararg val events: Event,
   private val throwOnGet: Exception? = null,
+  private val throwOnSave: Exception? = null,
 ) : EventsRepository {
 
   private val stored = mutableListOf(*events)
@@ -578,10 +609,12 @@ private class FakeEventsRepository(
   }
 
   override suspend fun add(event: Event) {
+    if (throwOnSave != null) throw throwOnSave
     stored.add(event)
   }
 
   override suspend fun update(event: Event) {
+    if (throwOnSave != null) throw throwOnSave
     val index = stored.indexOfFirst { it.id == event.id }
     if (index >= 0) stored[index] = event else stored.add(event)
   }
