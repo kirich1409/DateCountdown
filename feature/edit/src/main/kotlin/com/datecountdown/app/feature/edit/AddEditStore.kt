@@ -55,7 +55,7 @@ internal interface AddEditStore : Store<AddEditStore.Intent, AddEditState, AddEd
      * User tapped the Save button.
      *
      * Triggers [SaveEventUseCase]; transitions to [AddEditState.Form.isSaving] = true while in
-     * flight. On success emits [Label.Saved]; on failure surfaces [AddEditState.Form.saveError].
+     * flight. On success emits [Label.Saved]; on failure populates [AddEditState.Form.saveError].
      */
     data object Save : Intent
 
@@ -120,7 +120,7 @@ private sealed interface Message {
 
   data object SaveStarted : Message
   data object SaveSucceeded : Message
-  data class SaveFailed(val message: String) : Message
+  data class SaveFailed(val cause: Throwable) : Message
 
   /** Reveals the discard-confirmation dialog ([AddEditState.Form.showDiscardConfirmation] = true). */
   data object ShowDiscardConfirmation : Message
@@ -261,7 +261,7 @@ private class Executor(
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        dispatch(Message.SaveFailed(message = e.message ?: "Unknown error"))
+        dispatch(Message.SaveFailed(cause = e))
       }
     }
   }
@@ -311,10 +311,10 @@ private object AddEditReducer : Reducer<AddEditState, Message> {
         color = msg.event.color,
         icon = msg.event.icon,
       )
-      is Message.EventNotFound -> AddEditState.LoadError(message = "Event not found")
-      is Message.LoadFailed -> AddEditState.LoadError(
-        message = msg.cause.message ?: "Failed to load event",
+      is Message.EventNotFound -> AddEditState.LoadError(
+        cause = NoSuchElementException("Event not found"),
       )
+      is Message.LoadFailed -> AddEditState.LoadError(cause = msg.cause)
       is Message.DefaultsLoaded -> AddEditState.Form(
         title = msg.title,
         targetDateTime = msg.targetDateTime,
@@ -339,7 +339,7 @@ private object AddEditReducer : Reducer<AddEditState, Message> {
     when (msg) {
       Message.SaveStarted -> asForm { copy(isSaving = true, saveError = null) }
       Message.SaveSucceeded -> asForm { copy(isSaving = false, saveError = null) }
-      is Message.SaveFailed -> asForm { copy(isSaving = false, saveError = msg.message) }
+      is Message.SaveFailed -> asForm { copy(isSaving = false, saveError = msg.cause) }
       else -> this
     }
 

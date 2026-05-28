@@ -31,8 +31,9 @@ sealed interface AddEditState {
    * [isSaving] is true while [SaveEventUseCase] is in progress. The UI should disable the
    * save button and show an inline spinner during this window.
    *
-   * [saveError] carries the error message when [SaveEventUseCase] returns a failure. The UI
-   * renders an error snackbar or inline hint. Null when no error is pending.
+   * [saveError] carries the Throwable when [SaveEventUseCase] returns a failure. Preserved as
+   * Throwable (not stringified) so Crashlytics/Sentry can capture the full stack trace when wired.
+   * The UI formats [Throwable.message] for display. Null when no error is pending.
    */
   data class Form(
     val title: String,
@@ -41,7 +42,7 @@ sealed interface AddEditState {
     val icon: EventIcon,
     val hasUnsavedChanges: Boolean = false,
     val isSaving: Boolean = false,
-    val saveError: String? = null,
+    val saveError: Throwable? = null,
     /**
      * True while the "discard unsaved changes?" confirmation dialog should be shown (AC-AE-10).
      * Set to true by [AddEditStore.Intent.RequestDismiss] when [hasUnsavedChanges] is true;
@@ -54,8 +55,8 @@ sealed interface AddEditState {
   /**
    * The event to edit was not found in the repository, or a repository error occurred on load.
    *
-   * [message] is a developer-oriented description; the Compose UI may display a localized string
-   * instead. The user can only dismiss the sheet from this state.
+   * [cause] is preserved as Throwable (not stringified) for Crashlytics/Sentry hookup. The
+   * Compose UI formats [Throwable.message] for display. The user can only dismiss from this state.
    */
-  data class LoadError(val message: String) : AddEditState
+  data class LoadError(val cause: Throwable) : AddEditState
 }

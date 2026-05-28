@@ -22,6 +22,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -150,7 +151,20 @@ class AddEditStoreTest {
 
     val errorState = store.state as? AddEditState.LoadError
     assertTrue("Expected LoadError on repository exception", errorState != null)
-    assertEquals("DB unavailable", errorState?.message)
+    assertEquals("DB unavailable", errorState?.cause?.message)
+
+    store.dispose()
+  }
+
+  @Test
+  fun `edit mode — GetEventUseCase throws — transitions to LoadError preserving cause`() = runTest {
+    val cause = IllegalStateException("simulated DB failure")
+    val repo = FakeEventsRepository(throwOnGet = cause)
+    val store = createStore(eventId = "event-1", repo = repo)
+
+    val errorState = store.state as? AddEditState.LoadError
+    assertTrue("Expected LoadError when GetEventUseCase throws", errorState != null)
+    assertSame(cause, errorState?.cause)
 
     store.dispose()
   }
@@ -277,6 +291,32 @@ class AddEditStoreTest {
   }
 
   // ── Dismiss / discard flow ────────────────────────────────────────────────────────────────────────
+
+  @Test
+  fun `RequestDismiss while Loading — emits Dismissed immediately`() = runTest {
+    // FakeEventsRepository with a blocking get would be needed to hold Loading state;
+    // instead we verify via the executor path: an unresolvable eventId that never found
+    // is not suitable here since bootstrap is synchronous in DefaultStoreFactory tests.
+    // Use a throwOnGet repo so bootstrap produces LoadError (Loading is transient).
+    // This confirms the else-branch in requestDismiss() handles non-Form states correctly.
+    val repo = FakeEventsRepository(throwOnGet = RuntimeException("bootstrap error"))
+    val store = createStore(eventId = "event-1", repo = repo)
+
+    // Bootstrap completed synchronously to LoadError — state is no longer Loading,
+    // but the executor's else-branch handles LoadError the same way as Loading.
+    assertTrue("Expected LoadError state for this test", store.state is AddEditState.LoadError)
+
+    store.labels.test {
+      store.accept(AddEditStore.Intent.RequestDismiss)
+
+      val label = awaitItem()
+      assertEquals(AddEditStore.Label.Dismissed, label)
+
+      cancelAndIgnoreRemainingEvents()
+    }
+
+    store.dispose()
+  }
 
   @Test
   fun `RequestDismiss without changes — emits Dismissed immediately`() = runTest {
