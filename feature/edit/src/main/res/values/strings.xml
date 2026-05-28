@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="add_edit_title_create">New Event</string>
+  <string name="add_edit_title_edit">Edit Event</string>
+  <string name="add_edit_save">Save</string>
+  <string name="add_edit_close_cd">Close</string>
+  <string name="add_edit_title_label">Title</string>
+  <string name="add_edit_title_placeholder">Event name</string>
+  <string name="add_edit_datetime_label">Date and time</string>
+  <string name="add_edit_color_picker_label">Color</string>
+  <string name="add_edit_icon_picker_label">Icon</string>
+  <string name="add_edit_color_a11y">%s color</string>
+  <string name="add_edit_color_selected">%s, selected</string>
+  <string name="add_edit_color_not_selected">%s, not selected</string>
+  <string name="add_edit_icon_a11y">%s icon</string>
+  <string name="add_edit_discard_title">Discard changes?</string>
+  <string name="add_edit_discard_message">Your unsaved changes will be lost.</string>
+  <string name="add_edit_discard_yes">Discard</string>
+  <string name="add_edit_discard_no">Keep editing</string>
+  <string name="add_edit_save_error_generic">Could not save. Please try again.</string>
+  <string name="add_edit_load_error_back">Go back</string>
+</resources>
