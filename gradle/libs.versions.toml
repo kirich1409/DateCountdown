@@ -21,6 +21,7 @@ room = "2.8.4"
 datastore = "1.2.1"
 kotlinxDatetime = "0.6.2"
 turbine = "1.2.1"
+robolectric = "4.14.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -67,6 +68,7 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 
 # Turbine — Flow testing utility (wired into test source sets in epic 7)
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
 # Gradle plugin artifacts consumed by build-logic convention plugins (compileOnly / implementation on the build classpath, not app deps).
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "androidGradlePlugin" }
