@@ -310,7 +310,6 @@ private object AddEditReducer : Reducer<AddEditState, Message> {
         targetDateTime = msg.event.targetDateTime,
         color = msg.event.color,
         icon = msg.event.icon,
-        hasUnsavedChanges = false,
       )
       is Message.EventNotFound -> AddEditState.LoadError(message = "Event not found")
       is Message.LoadFailed -> AddEditState.LoadError(
@@ -321,7 +320,6 @@ private object AddEditReducer : Reducer<AddEditState, Message> {
         targetDateTime = msg.targetDateTime,
         color = msg.color,
         icon = msg.icon,
-        hasUnsavedChanges = false,
       )
       else -> this
     }
