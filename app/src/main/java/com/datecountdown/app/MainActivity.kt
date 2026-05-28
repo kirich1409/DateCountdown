@@ -4,10 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.material3.Text
-import androidx.compose.runtime.getValue
 import com.arkivanov.decompose.defaultComponentContext
-import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
 import com.datecountdown.app.core.design.theme.ThemeMode
 import com.datecountdown.app.di.AppGraph
@@ -18,6 +15,7 @@ import com.datecountdown.app.domain.usecase.GetEventUseCase
 import com.datecountdown.app.domain.usecase.GetEventsUseCase
 import com.datecountdown.app.domain.usecase.SaveEventUseCase
 import com.datecountdown.app.navigation.RootComponent
+import com.datecountdown.app.navigation.RootContent
 import dev.zacsweers.metro.createGraphFactory
 
 /**
@@ -28,10 +26,8 @@ import dev.zacsweers.metro.createGraphFactory
  *     its lifetime spans the Activity.
  *  2. [RootComponent] is created with [defaultComponentContext] — this binds Decompose's
  *     lifecycle/state-keeper/back-handler to the Activity (requires [ComponentActivity]).
- *  3. [setContent] renders a minimal placeholder; epic 4 replaces this with the real nav host.
- *
- * TODO(epic 4): replace the placeholder [Text] with the real Decompose nav host composable that
- *  dispatches on [RootComponent.stack] and [RootComponent.editSlot].
+ *  3. [setContent] delegates to [RootContent] which wires [RootComponent.stack] (List ↔ Counter)
+ *     and [RootComponent.editSlot] (add/edit bottom sheet overlay).
  */
 class MainActivity : ComponentActivity() {
 
@@ -75,10 +71,7 @@ class MainActivity : ComponentActivity() {
       // TODO(#28/#44): replace ThemeMode.SYSTEM with the DataStore-backed value from
       //  SettingsRepository once issue #28 (settings persistence) lands.
       DateCountdownTheme(themeMode = ThemeMode.SYSTEM) {
-        // Placeholder: display the active stack config name so the skeleton is visually verifiable.
-        // TODO(epic 4, #35/#39/#41): replace with NavHost that renders feature screens.
-        val stack by root.stack.subscribeAsState()
-        Text(text = "Active: ${stack.active.configuration}")
+        RootContent(root = root)
       }
     }
   }

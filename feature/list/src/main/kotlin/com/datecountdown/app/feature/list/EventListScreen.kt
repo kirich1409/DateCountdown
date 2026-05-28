@@ -112,7 +112,7 @@ import kotlin.time.Duration.Companion.days
  * Neither is a separate sealed subtype in the Store.
  */
 @Composable
-internal fun EventListScreen(component: EventListComponent) {
+fun EventListScreen(component: EventListComponent) {
   val state by component.state.subscribeAsState()
   EventListScreenContent(
     state = state,

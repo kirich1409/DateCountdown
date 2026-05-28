@@ -97,7 +97,7 @@ import kotlinx.datetime.toLocalDateTime
  * to close immediately (no unsaved changes) or show the discard-confirmation dialog (AC-AE-10).
  */
 @Composable
-internal fun AddEditScreen(
+fun AddEditScreen(
   component: AddEditComponent,
   modifier: Modifier = Modifier,
 ) {

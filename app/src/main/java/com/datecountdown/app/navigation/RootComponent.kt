@@ -129,8 +129,12 @@ class RootComponent(
   }
 
   private fun onBack() {
+    val activeEditChild = editSlot.value.child?.instance?.component
     when {
-      editSlot.value.child != null -> slotNavigation.dismiss()
+      // Route through the component so the Store can intercept and show the
+      // discard-confirmation dialog if there are unsaved changes (AC-AE-10).
+      // Was calling slotNavigation.dismiss() directly, bypassing the component contract.
+      activeEditChild != null -> activeEditChild.onDismissRequest()
       stack.value.backStack.isNotEmpty() -> stackNavigation.pop()
       // Unreachable: callback is disabled when both conditions are false.
     }
