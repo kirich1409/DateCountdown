@@ -12,6 +12,8 @@ import com.datecountdown.app.data.NotificationSchedulerImpl
 import com.datecountdown.app.data.SettingsRepositoryImpl
 import com.datecountdown.app.data.local.AppDatabase
 import com.datecountdown.app.data.local.EventDao
+import com.arkivanov.mvikotlin.core.store.StoreFactory
+import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
 import com.datecountdown.app.domain.EventsRepository
 import com.datecountdown.app.domain.NotificationScheduler
 import com.datecountdown.app.domain.SettingsRepository
@@ -49,6 +51,9 @@ interface AppGraph {
 
   /** Accessor exposed so downstream components can receive [NotificationScheduler] by type. */
   val notificationScheduler: NotificationScheduler
+
+  /** Accessor exposed so feature components can obtain the MVIKotlin [StoreFactory]. */
+  val storeFactory: StoreFactory
 
   @DependencyGraph.Factory
   fun interface Factory {
@@ -100,4 +105,8 @@ interface AppGraph {
     context = application,
     alarmManager = alarmManager,
   )
+
+  @SingleIn(AppScope::class)
+  @Provides
+  fun provideStoreFactory(): StoreFactory = DefaultStoreFactory()
 }

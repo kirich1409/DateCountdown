@@ -15,6 +15,11 @@ import com.arkivanov.decompose.value.ObserveLifecycleMode
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.decompose.value.subscribe
 import com.arkivanov.essenty.backhandler.BackCallback
+import com.arkivanov.mvikotlin.core.store.StoreFactory
+import com.datecountdown.app.domain.NotificationScheduler
+import com.datecountdown.app.domain.SettingsRepository
+import com.datecountdown.app.domain.usecase.DeleteEventUseCase
+import com.datecountdown.app.domain.usecase.GetEventsUseCase
 import com.datecountdown.app.feature.counter.CounterComponent
 import com.datecountdown.app.feature.counter.DefaultCounterComponent
 import com.datecountdown.app.feature.edit.AddEditComponent
@@ -51,6 +56,11 @@ import kotlinx.serialization.Serializable
  */
 class RootComponent(
   componentContext: ComponentContext,
+  private val storeFactory: StoreFactory,
+  private val getEvents: GetEventsUseCase,
+  private val deleteEvent: DeleteEventUseCase,
+  private val notificationScheduler: NotificationScheduler,
+  private val settings: SettingsRepository,
 ) : ComponentContext by componentContext {
 
   // ── Primary stack navigation (AC-NAV-1) ──────────────────────────────────────────────────────
@@ -179,6 +189,11 @@ class RootComponent(
       Config.List -> Child.ListChild(
         component = DefaultEventListComponent(
           componentContext = ctx,
+          storeFactory = storeFactory,
+          getEvents = getEvents,
+          deleteEvent = deleteEvent,
+          scheduler = notificationScheduler,
+          settings = settings,
           output = ::onListOutput,
         ),
       )
@@ -206,7 +221,6 @@ class RootComponent(
     when (output) {
       is EventListComponent.Output.OpenCounter -> pushCounter(output.eventId)
       EventListComponent.Output.AddEvent -> showEdit(eventId = null)
-      is EventListComponent.Output.EditEvent -> showEdit(output.eventId)
     }
   }
 
