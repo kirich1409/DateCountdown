@@ -74,4 +74,11 @@
   <!-- More menu -->
   <string name="list_menu_settings">Настройки</string>
   <string name="list_menu_enable_notifications">Включить уведомления</string>
+
+  <!-- Theme settings dialog -->
+  <string name="settings_theme_title">Тема</string>
+  <string name="settings_theme_system">Системная</string>
+  <string name="settings_theme_light">Светлая</string>
+  <string name="settings_theme_dark">Тёмная</string>
+  <string name="settings_theme_dialog_close">Закрыть</string>
 </resources>

@@ -9,6 +9,7 @@ import com.datecountdown.app.domain.Event
 import com.datecountdown.app.domain.EventId
 import com.datecountdown.app.domain.NotificationScheduler
 import com.datecountdown.app.domain.SettingsRepository
+import com.datecountdown.app.domain.ThemeMode
 import com.datecountdown.app.domain.usecase.DeleteEventUseCase
 import com.datecountdown.app.domain.usecase.GetEventsUseCase
 import kotlinx.coroutines.CancellationException
@@ -58,6 +59,15 @@ internal interface EventListStore : Store<EventListStore.Intent, EventListState,
 
     /** Flip the pastCollapsed flag and persist it (AC-LS-11). */
     data object TogglePastSection : Intent
+
+    /**
+     * Persist the selected theme mode (AC-TH-10).
+     *
+     * Calls [SettingsRepository.setThemeMode] and does NOT dispatch an optimistic message —
+     * [settings.themeMode] Flow is the single source of truth and will re-emit the new value,
+     * updating the state via [Message.SetData].
+     */
+    data class UpdateThemeMode(val mode: ThemeMode) : Intent
   }
 
   sealed interface Label {
@@ -73,6 +83,7 @@ private sealed interface Message {
     val upcoming: List<Event>,
     val past: List<Event>,
     val pastCollapsed: Boolean,
+    val themeMode: ThemeMode,
   ) : Message
 
   data class SetPendingDelete(val pending: PendingDelete) : Message
@@ -141,6 +152,7 @@ private class Executor(
       is EventListStore.Intent.DeleteEvent -> softDelete(intent.id)
       EventListStore.Intent.UndoDelete -> undoDelete()
       EventListStore.Intent.TogglePastSection -> togglePastSection()
+      is EventListStore.Intent.UpdateThemeMode -> updateThemeMode(intent.mode)
     }
   }
 
@@ -154,11 +166,13 @@ private class Executor(
       combine(
         getEvents(),
         settings.pastCollapsed,
-      ) { eventsView, pastCollapsed ->
+        settings.themeMode,
+      ) { eventsView, pastCollapsed, themeMode ->
         Message.SetData(
           upcoming = eventsView.upcoming,
           past = eventsView.past,
           pastCollapsed = pastCollapsed,
+          themeMode = themeMode,
         )
       }.collect { message ->
         dispatch(message)
@@ -226,6 +240,12 @@ private class Executor(
     // Do not dispatch an optimistic message — settings.pastCollapsed Flow is the single source of
     // truth and will re-emit with the new value, updating the state via SetData.
   }
+
+  private fun updateThemeMode(mode: ThemeMode) {
+    scope.launch { settings.setThemeMode(mode) }
+    // Do not dispatch an optimistic message — settings.themeMode Flow is the single source of
+    // truth and will re-emit with the new value, updating the state via SetData.
+  }
 }
 
 // ── Reducer ────────────────────────────────────────────────────────────────────────────────────────
@@ -239,12 +259,14 @@ private object EventListReducer : Reducer<EventListState, Message> {
           upcoming = msg.upcoming,
           past = msg.past,
           pastCollapsed = msg.pastCollapsed,
+          themeMode = msg.themeMode,
           // Preserve the in-memory pendingDelete across data refreshes.
         )
         else -> EventListState.Content(
           upcoming = msg.upcoming,
           past = msg.past,
           pastCollapsed = msg.pastCollapsed,
+          themeMode = msg.themeMode,
           pendingDelete = null,
         )
       }

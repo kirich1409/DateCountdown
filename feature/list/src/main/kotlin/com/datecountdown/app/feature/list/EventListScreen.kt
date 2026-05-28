@@ -23,10 +23,12 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -38,6 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -47,6 +50,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -55,6 +59,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,6 +86,7 @@ import com.datecountdown.app.domain.Event
 import com.datecountdown.app.domain.EventColor
 import com.datecountdown.app.domain.EventIcon as DomainEventIcon
 import com.datecountdown.app.domain.EventId
+import com.datecountdown.app.domain.ThemeMode
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlin.time.Duration.Companion.days
@@ -121,6 +127,7 @@ fun EventListScreen(component: EventListComponent) {
     onDelete = component::onDelete,
     onUndoDelete = component::onUndoDelete,
     onTogglePast = component::onTogglePast,
+    onThemeModeChange = component::onThemeModeChange,
   )
 }
 
@@ -153,10 +160,12 @@ internal fun EventListScreenContent(
   onDelete: (id: EventId) -> Unit,
   onUndoDelete: () -> Unit,
   onTogglePast: () -> Unit,
+  onThemeModeChange: (ThemeMode) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val snackbarHostState = remember { SnackbarHostState() }
   val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+  var showSettingsDialog by rememberSaveable { mutableStateOf(false) }
 
   ObservePendingDeleteSnackbar(
     state = state,
@@ -169,10 +178,25 @@ internal fun EventListScreenContent(
   val isGlobalEmpty = contentState?.upcoming?.isEmpty() == true && contentState.past.isEmpty()
   val subtitle = buildSubtitle(isGlobalEmpty = isGlobalEmpty, upcomingCount = upcomingCount)
 
+  if (showSettingsDialog) {
+    SettingsThemeDialog(
+      currentMode = state.themeMode,
+      onModeSelected = { mode ->
+        onThemeModeChange(mode)
+        showSettingsDialog = false
+      },
+      onDismiss = { showSettingsDialog = false },
+    )
+  }
+
   Scaffold(
     modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     topBar = {
-      ListTopBar(subtitle = subtitle, scrollBehavior = scrollBehavior)
+      ListTopBar(
+        subtitle = subtitle,
+        scrollBehavior = scrollBehavior,
+        onSettingsClick = { showSettingsDialog = true },
+      )
     },
     floatingActionButton = { ListFab(onClick = onAddClick) },
     snackbarHost = {
@@ -280,6 +304,7 @@ private fun ContentBody(
 private fun ListTopBar(
   subtitle: String,
   scrollBehavior: TopAppBarScrollBehavior,
+  onSettingsClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   var menuExpanded by remember { mutableStateOf(false) }
@@ -336,7 +361,10 @@ private fun ListTopBar(
         ) {
           DropdownMenuItem(
             text = { Text(stringResource(R.string.list_menu_settings)) },
-            onClick = { menuExpanded = false },
+            onClick = {
+              menuExpanded = false
+              onSettingsClick()
+            },
           )
           // AC-LS-19: "Enable notifications" item shown only when runtime permission is absent.
           // Permission checking is implemented in issue #44.
@@ -781,6 +809,92 @@ private fun ListFab(
   )
 }
 
+// ── Settings theme dialog ────────────────────────────────────────────────────────────────────────
+
+/**
+ * Material 3 AlertDialog for choosing the app theme (AC-TH-10).
+ *
+ * Displays three radio-button rows (System / Light / Dark). Tapping a row selects it,
+ * persists the choice via [onModeSelected], and dismisses the dialog. A "Close" button
+ * is provided as an accessible dismiss affordance for TalkBack users who cannot easily
+ * swipe-dismiss.
+ *
+ * Accessibility: each row uses [Modifier.selectable] with [Role.RadioButton] so that
+ * TalkBack announces the row as a selectable radio-button and handles the click. The inner
+ * [RadioButton] has `onClick = null` so the row is the single interactive element.
+ */
+@Composable
+internal fun SettingsThemeDialog(
+  currentMode: ThemeMode,
+  onModeSelected: (ThemeMode) -> Unit,
+  onDismiss: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text(stringResource(R.string.settings_theme_title)) },
+    text = {
+      Column {
+        ThemeModeRow(
+          label = stringResource(R.string.settings_theme_system),
+          selected = currentMode == ThemeMode.SYSTEM,
+          onClick = { onModeSelected(ThemeMode.SYSTEM) },
+        )
+        ThemeModeRow(
+          label = stringResource(R.string.settings_theme_light),
+          selected = currentMode == ThemeMode.LIGHT,
+          onClick = { onModeSelected(ThemeMode.LIGHT) },
+        )
+        ThemeModeRow(
+          label = stringResource(R.string.settings_theme_dark),
+          selected = currentMode == ThemeMode.DARK,
+          onClick = { onModeSelected(ThemeMode.DARK) },
+        )
+      }
+    },
+    confirmButton = {},
+    dismissButton = {
+      TextButton(onClick = onDismiss) {
+        Text(stringResource(R.string.settings_theme_dialog_close))
+      }
+    },
+    modifier = modifier,
+  )
+}
+
+@Composable
+private fun ThemeModeRow(
+  label: String,
+  selected: Boolean,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  Row(
+    modifier = modifier
+      .fillMaxWidth()
+      .selectable(
+        selected = selected,
+        onClick = onClick,
+        role = Role.RadioButton,
+      )
+      .padding(vertical = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+  ) {
+    RadioButton(
+      selected = selected,
+      // null — the enclosing Row owns the click via selectable(); having two click targets
+      // on the same logical item would produce double TalkBack announcements.
+      onClick = null,
+    )
+    Text(
+      text = label,
+      style = MaterialTheme.typography.bodyLarge,
+      color = MaterialTheme.colorScheme.onSurface,
+    )
+  }
+}
+
 // ── Previews ─────────────────────────────────────────────────────────────────────────────────────
 
 private val previewNow: Instant = Clock.System.now()
@@ -827,6 +941,7 @@ private fun EventListLoadingPreview() {
       onDelete = {},
       onUndoDelete = {},
       onTogglePast = {},
+      onThemeModeChange = {},
     )
   }
 }
@@ -848,6 +963,7 @@ private fun EventListGlobalEmptyPreview() {
       onDelete = {},
       onUndoDelete = {},
       onTogglePast = {},
+      onThemeModeChange = {},
     )
   }
 }
@@ -869,6 +985,7 @@ private fun EventListUpcomingOnlyPreview() {
       onDelete = {},
       onUndoDelete = {},
       onTogglePast = {},
+      onThemeModeChange = {},
     )
   }
 }
@@ -890,6 +1007,7 @@ private fun EventListWithCollapsedPastPreview() {
       onDelete = {},
       onUndoDelete = {},
       onTogglePast = {},
+      onThemeModeChange = {},
     )
   }
 }
@@ -911,6 +1029,7 @@ private fun EventListWithExpandedPastPreview() {
       onDelete = {},
       onUndoDelete = {},
       onTogglePast = {},
+      onThemeModeChange = {},
     )
   }
 }
@@ -932,6 +1051,7 @@ private fun EventListPartialEmptyPreview() {
       onDelete = {},
       onUndoDelete = {},
       onTogglePast = {},
+      onThemeModeChange = {},
     )
   }
 }
@@ -948,6 +1068,46 @@ private fun EventListErrorPreview() {
       onDelete = {},
       onUndoDelete = {},
       onTogglePast = {},
+      onThemeModeChange = {},
+    )
+  }
+}
+
+@Suppress("UnusedPrivateMember")
+@PreviewLightDark
+@Composable
+private fun SettingsThemeDialogSystemPreview() {
+  DateCountdownTheme {
+    SettingsThemeDialog(
+      currentMode = ThemeMode.SYSTEM,
+      onModeSelected = {},
+      onDismiss = {},
+    )
+  }
+}
+
+@Suppress("UnusedPrivateMember")
+@PreviewLightDark
+@Composable
+private fun SettingsThemeDialogLightPreview() {
+  DateCountdownTheme {
+    SettingsThemeDialog(
+      currentMode = ThemeMode.LIGHT,
+      onModeSelected = {},
+      onDismiss = {},
+    )
+  }
+}
+
+@Suppress("UnusedPrivateMember")
+@PreviewLightDark
+@Composable
+private fun SettingsThemeDialogDarkPreview() {
+  DateCountdownTheme {
+    SettingsThemeDialog(
+      currentMode = ThemeMode.DARK,
+      onModeSelected = {},
+      onDismiss = {},
     )
   }
 }

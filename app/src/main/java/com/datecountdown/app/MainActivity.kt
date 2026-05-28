@@ -4,9 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.arkivanov.decompose.defaultComponentContext
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
-import com.datecountdown.app.core.design.theme.ThemeMode
 import com.datecountdown.app.di.AppGraph
 import com.datecountdown.app.domain.CountdownCalculator
 import com.datecountdown.app.domain.PastEventProcessor
@@ -68,9 +69,13 @@ class MainActivity : ComponentActivity() {
 
     enableEdgeToEdge()
     setContent {
-      // TODO(#28/#44): replace ThemeMode.SYSTEM with the DataStore-backed value from
-      //  SettingsRepository once issue #28 (settings persistence) lands.
-      DateCountdownTheme(themeMode = ThemeMode.SYSTEM) {
+      val domainThemeMode by graph.settingsRepository.themeMode.collectAsStateWithLifecycle(
+        initialValue = com.datecountdown.app.domain.ThemeMode.SYSTEM,
+      )
+      // Bridge domain ThemeMode → design ThemeMode by ordinal. Both enums declare the same three
+      // entries in the same order (SYSTEM=0, LIGHT=1, DARK=2), so ordinal mapping is stable.
+      val designThemeMode = com.datecountdown.app.core.design.theme.ThemeMode.entries[domainThemeMode.ordinal]
+      DateCountdownTheme(themeMode = designThemeMode) {
         RootContent(root = root)
       }
     }
