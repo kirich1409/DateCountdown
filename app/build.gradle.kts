@@ -65,6 +65,10 @@ dependencies {
   // RootComponent passes Clock to DefaultAddEditComponent, so we declare it explicitly.
   implementation(libs.kotlinx.datetime)
 
+  // kotlinx-coroutines-core is an implementation dep in :domain (not api), so it is not
+  // transitively visible here. AlarmReceiver.onReceive uses goAsync + CoroutineScope.
+  implementation(libs.kotlinx.coroutines.core)
+
   // Design system — theme, colors, typography
   implementation(project(":core:design"))
 

@@ -1,3 +1,7 @@
 <resources>
-    <string name="app_name">DateCountdown</string>
+    <string name="app_name" translatable="false">DateCountdown</string>
+    <string name="notification_channel_name">Events</string>
+    <string name="notification_channel_description">Event reminders</string>
+    <string name="notification_today_text">Today!</string>
+    <string name="notification_public_text">Event reminder</string>
 </resources>

@@ -17,6 +17,7 @@ import com.datecountdown.app.domain.usecase.GetEventsUseCase
 import com.datecountdown.app.domain.usecase.SaveEventUseCase
 import com.datecountdown.app.navigation.RootComponent
 import com.datecountdown.app.navigation.RootContent
+import com.datecountdown.app.notifications.NotificationChannels
 import dev.zacsweers.metro.createGraphFactory
 
 /**
@@ -34,6 +35,10 @@ class MainActivity : ComponentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+
+    // Ensure notification channel exists before any alarm can fire (AC-NT-7).
+    // Idempotent — safe to call on every Activity creation.
+    NotificationChannels.ensureChannel(applicationContext)
 
     // Metro root graph — holds all app-scoped singletons (AppDatabase, EventDao, EventsRepository).
     // Application is passed through AppGraph.Factory so Room.databaseBuilder has a Context.
