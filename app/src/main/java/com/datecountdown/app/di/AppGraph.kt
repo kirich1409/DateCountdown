@@ -1,5 +1,6 @@
 package com.datecountdown.app.di
 
+import android.app.AlarmManager
 import android.app.Application
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -7,10 +8,12 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.datecountdown.app.data.EventsRepositoryImpl
+import com.datecountdown.app.data.NotificationSchedulerImpl
 import com.datecountdown.app.data.SettingsRepositoryImpl
 import com.datecountdown.app.data.local.AppDatabase
 import com.datecountdown.app.data.local.EventDao
 import com.datecountdown.app.domain.EventsRepository
+import com.datecountdown.app.domain.NotificationScheduler
 import com.datecountdown.app.domain.SettingsRepository
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
@@ -25,15 +28,15 @@ import dev.zacsweers.metro.SingleIn
  * [dev.zacsweers.metro.createGraphFactory]; its lifetime therefore matches the Activity.
  *
  * [AppDatabase] and [EventDao] are provided as singletons here — the database must not be
- * rebuilt per injection. [EventsRepository] and [SettingsRepository] are likewise scoped so
- * all callers share the same instance.
+ * rebuilt per injection. [EventsRepository], [SettingsRepository], and [NotificationScheduler]
+ * are likewise scoped so all callers share the same instance.
  *
  * Note: [AppDatabase], [EventDao], and [EventEntity] were all promoted from `internal` to public.
  * [EventDao]'s generated Room impl exposes [EventEntity] in its signatures, so Kotlin requires
- * [EventEntity] to also be public once [EventDao] is public. [SettingsRepositoryImpl] is also
- * public for the same cross-module Metro wiring reason. None of these types are part of the
- * intended public API of [:data] — they are implementation details exposed only to satisfy
- * the Metro wiring in [:app].
+ * [EventEntity] to also be public once [EventDao] is public. [SettingsRepositoryImpl] and
+ * [NotificationSchedulerImpl] are also public for the same cross-module Metro wiring reason.
+ * None of these types are part of the intended public API of [:data] — they are implementation
+ * details exposed only to satisfy the Metro wiring in [:app].
  */
 @DependencyGraph(AppScope::class)
 interface AppGraph {
@@ -43,6 +46,9 @@ interface AppGraph {
 
   /** Accessor exposed so downstream components can receive [SettingsRepository] by type. */
   val settingsRepository: SettingsRepository
+
+  /** Accessor exposed so downstream components can receive [NotificationScheduler] by type. */
+  val notificationScheduler: NotificationScheduler
 
   @DependencyGraph.Factory
   fun interface Factory {
@@ -77,4 +83,21 @@ interface AppGraph {
   @Provides
   fun provideSettingsRepository(dataStore: DataStore<Preferences>): SettingsRepository =
     SettingsRepositoryImpl(dataStore)
+
+  @SingleIn(AppScope::class)
+  @Provides
+  fun provideAlarmManager(application: Application): AlarmManager =
+    requireNotNull(application.getSystemService(AlarmManager::class.java)) {
+      "AlarmManager system service unavailable — this should never happen on a real device"
+    }
+
+  @SingleIn(AppScope::class)
+  @Provides
+  fun provideNotificationScheduler(
+    application: Application,
+    alarmManager: AlarmManager,
+  ): NotificationScheduler = NotificationSchedulerImpl(
+    context = application,
+    alarmManager = alarmManager,
+  )
 }

@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Exact alarm scheduling: API 31-33 runtime permission (USE_EXACT_ALARM covers 33+, SCHEDULE_EXACT_ALARM is the fallback for 31-32).
+         USE_EXACT_ALARM is the "exempt" path for alarm/reminder apps; no UI flow to settings.
+         SCHEDULE_EXACT_ALARM may be denied by the user on 31-32; denial handling is #48's scope. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -20,6 +26,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- AlarmReceiver: placeholder for issue #45. exported=false — only this app can trigger it (AC-NT-9).
+             No intent-filter; AlarmManager targets it via explicit ComponentName. -->
+        <receiver
+            android:name=".notifications.AlarmReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>
