@@ -23,12 +23,14 @@ import com.datecountdown.app.domain.SettingsRepository
 import com.datecountdown.app.domain.usecase.DeleteEventUseCase
 import com.datecountdown.app.domain.usecase.GetEventUseCase
 import com.datecountdown.app.domain.usecase.GetEventsUseCase
+import com.datecountdown.app.domain.usecase.SaveEventUseCase
 import com.datecountdown.app.feature.counter.CounterComponent
 import com.datecountdown.app.feature.counter.DefaultCounterComponent
 import com.datecountdown.app.feature.edit.AddEditComponent
 import com.datecountdown.app.feature.edit.DefaultAddEditComponent
 import com.datecountdown.app.feature.list.DefaultEventListComponent
 import com.datecountdown.app.feature.list.EventListComponent
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 
 /**
@@ -64,10 +66,12 @@ class RootComponent(
   private val getEvents: GetEventsUseCase,
   private val deleteEvent: DeleteEventUseCase,
   private val getEvent: GetEventUseCase,
+  private val saveEvent: SaveEventUseCase,
   private val calculator: CountdownCalculator,
   private val pastProcessor: PastEventProcessor,
   private val notificationScheduler: NotificationScheduler,
   private val settings: SettingsRepository,
+  private val clock: Clock = Clock.System,
 ) : ComponentContext by componentContext {
 
   // ── Primary stack navigation (AC-NAV-1) ──────────────────────────────────────────────────────
@@ -223,6 +227,10 @@ class RootComponent(
       component = DefaultAddEditComponent(
         componentContext = ctx,
         eventId = config.eventId,
+        storeFactory = storeFactory,
+        getEvent = getEvent,
+        saveEvent = saveEvent,
+        clock = clock,
         output = ::onEditOutput,
       ),
     )
