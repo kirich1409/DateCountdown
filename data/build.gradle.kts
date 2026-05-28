@@ -8,6 +8,10 @@ android {
   namespace = "com.datecountdown.app.data"
 }
 
+ksp {
+  arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
   implementation(project(":domain"))
   implementation(libs.androidx.room.runtime)
