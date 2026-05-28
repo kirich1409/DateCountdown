@@ -16,9 +16,12 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.decompose.value.subscribe
 import com.arkivanov.essenty.backhandler.BackCallback
 import com.arkivanov.mvikotlin.core.store.StoreFactory
+import com.datecountdown.app.domain.CountdownCalculator
 import com.datecountdown.app.domain.NotificationScheduler
+import com.datecountdown.app.domain.PastEventProcessor
 import com.datecountdown.app.domain.SettingsRepository
 import com.datecountdown.app.domain.usecase.DeleteEventUseCase
+import com.datecountdown.app.domain.usecase.GetEventUseCase
 import com.datecountdown.app.domain.usecase.GetEventsUseCase
 import com.datecountdown.app.feature.counter.CounterComponent
 import com.datecountdown.app.feature.counter.DefaultCounterComponent
@@ -54,11 +57,15 @@ import kotlinx.serialization.Serializable
  *  The Store is destroyed when its back-stack entry is popped, not on configuration change.
  *  See [com.arkivanov.essenty.instancekeeper.InstanceKeeperExt].
  */
+@Suppress("LongParameterList")
 class RootComponent(
   componentContext: ComponentContext,
   private val storeFactory: StoreFactory,
   private val getEvents: GetEventsUseCase,
   private val deleteEvent: DeleteEventUseCase,
+  private val getEvent: GetEventUseCase,
+  private val calculator: CountdownCalculator,
+  private val pastProcessor: PastEventProcessor,
   private val notificationScheduler: NotificationScheduler,
   private val settings: SettingsRepository,
 ) : ComponentContext by componentContext {
@@ -201,6 +208,11 @@ class RootComponent(
         component = DefaultCounterComponent(
           componentContext = ctx,
           eventId = config.id,
+          storeFactory = storeFactory,
+          getEvent = getEvent,
+          deleteEvent = deleteEvent,
+          calculator = calculator,
+          pastProcessor = pastProcessor,
           output = ::onCounterOutput,
         ),
       )

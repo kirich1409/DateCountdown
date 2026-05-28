@@ -1,42 +1,133 @@
 package com.datecountdown.app.feature.counter
 
 import com.arkivanov.decompose.ComponentContext
+import com.arkivanov.decompose.value.Value
+import com.arkivanov.essenty.instancekeeper.InstanceKeeper
+import com.arkivanov.essenty.instancekeeper.getOrCreate
+import com.arkivanov.essenty.lifecycle.doOnStart
+import com.arkivanov.essenty.lifecycle.doOnStop
+import com.arkivanov.mvikotlin.core.rx.observer
+import com.arkivanov.mvikotlin.core.store.StoreFactory
+import com.datecountdown.app.domain.CountdownCalculator
+import com.datecountdown.app.domain.EventId
+import com.datecountdown.app.domain.PastEventProcessor
+import com.datecountdown.app.domain.usecase.DeleteEventUseCase
+import com.datecountdown.app.domain.usecase.GetEventUseCase
 
 /**
  * Component interface for the fullscreen event-counter screen.
  *
- * Per AC-NAV-5/6: the counter screen can trigger opening the edit sheet for the displayed event.
- * Navigation is handled by RootComponent translating Output → ChildSlot activation; this module
- * has no dependency on :feature:edit or any other feature module.
+ * Exposes observable [state] (bridged from [CounterStore] via [Value]) and three user-action
+ * entry points. Navigation outputs are emitted through [Output] so that [RootComponent] can
+ * translate them to navigation calls without creating a dependency between feature modules.
  *
- * TODO(#39): implement Store + Compose UI for epic 4.
+ * AC-NAV-5: edit action opens the add/edit sheet for the current event.
+ * AC-NAV-6: back / navigate-back pops the counter off the primary stack.
  */
 interface CounterComponent {
 
-  /** The id of the event being displayed. Supplied at creation time by RootComponent. */
-  val eventId: String
+  /** Observable UI state driven by [CounterStore]. */
+  val state: Value<CounterState>
+
+  /** User tapped the edit button — open the edit sheet for the current event. */
+  fun onEditClick()
+
+  /** User pressed the system back button or an explicit back button in the UI. */
+  fun onBackClick()
+
+  /** User confirmed deletion of the current event. */
+  fun onDeleteClick()
 
   /**
    * Navigation outputs from the counter screen.
+   *
+   * Translated to navigation actions by [com.datecountdown.app.navigation.RootComponent].
    */
   sealed interface Output {
-    /** User tapped "edit" — open the edit sheet for the current event. */
+    /** Open the edit sheet for [eventId]. */
     data class EditEvent(val eventId: String) : Output
 
-    /** User navigated back (system back or explicit back button). */
+    /** Pop the counter screen from the primary stack. */
     data object NavigateBack : Output
   }
 }
 
 /**
- * Default stub implementation.
+ * Default production implementation of [CounterComponent].
  *
- * TODO(#39): add MVIKotlin Store retained via `instanceKeeper.getOrCreate { CounterStore(...) }`.
+ * The [CounterStore] is retained across configuration changes via [instanceKeeper.getOrCreate]:
+ * the Store is destroyed only when the back-stack entry is popped, not on rotation.
+ *
+ * Tick lifecycle (AC-CL-10):
+ *  - [doOnStart] fires [CounterStore.Intent.StartTicking] — the 1 Hz ticker starts when the
+ *    component becomes visible.
+ *  - [doOnStop]  fires [CounterStore.Intent.StopTicking]  — the ticker pauses when the component
+ *    goes to the background, conserving resources.
+ *
+ * Label subscription (delete → navigate back):
+ *  Labels are one-shot signals. The subscription is set up once in [init] and lives until the
+ *  Store is disposed. [CounterStore.Label.NavigateBack] translates to [Output.NavigateBack].
  */
+@Suppress("LongParameterList")
 class DefaultCounterComponent(
   componentContext: ComponentContext,
-  override val eventId: String,
-  // output is consumed by epic 4 Store integration (#39); kept now to establish the contract.
-  @Suppress("UnusedPrivateProperty")
+  private val eventId: String,
+  storeFactory: StoreFactory,
+  getEvent: GetEventUseCase,
+  deleteEvent: DeleteEventUseCase,
+  calculator: CountdownCalculator,
+  pastProcessor: PastEventProcessor,
   private val output: (CounterComponent.Output) -> Unit,
-) : CounterComponent, ComponentContext by componentContext
+) : CounterComponent, ComponentContext by componentContext {
+
+  /**
+   * Retained wrapper: the Store is created once and destroyed with the component (back-stack pop),
+   * not on configuration change. [InstanceKeeper.Instance.onDestroy] calls [CounterStore.dispose]
+   * so that the Store's CoroutineExecutor scope is cancelled and all subscriptions are released.
+   */
+  private val store: CounterStore = instanceKeeper.getOrCreate {
+    object : InstanceKeeper.Instance {
+      val store: CounterStore = CounterStoreFactory(
+        storeFactory = storeFactory,
+        eventId = EventId(eventId),
+        getEvent = getEvent,
+        deleteEvent = deleteEvent,
+        calculator = calculator,
+        pastProcessor = pastProcessor,
+      ).create()
+
+      override fun onDestroy() {
+        store.dispose()
+      }
+    }
+  }.store
+
+  override val state: Value<CounterState> = store.asValue(lifecycle)
+
+  init {
+    // Tick gating: start/stop the 1 Hz ticker with component visibility.
+    lifecycle.doOnStart { store.accept(CounterStore.Intent.StartTicking) }
+    lifecycle.doOnStop { store.accept(CounterStore.Intent.StopTicking) }
+
+    // Translate Label.NavigateBack (emitted after delete) to the output callback.
+    store.labels(
+      observer { label ->
+        when (label) {
+          CounterStore.Label.NavigateBack -> output(CounterComponent.Output.NavigateBack)
+        }
+      },
+    )
+  }
+
+  override fun onEditClick() {
+    output(CounterComponent.Output.EditEvent(eventId = eventId))
+  }
+
+  override fun onBackClick() {
+    output(CounterComponent.Output.NavigateBack)
+  }
+
+  override fun onDeleteClick() {
+    store.accept(CounterStore.Intent.Delete)
+  }
+}
