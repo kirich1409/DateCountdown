@@ -6,6 +6,10 @@ plugins {
 
 android {
   namespace = "com.datecountdown.app.data"
+
+  testOptions {
+    unitTests.isIncludeAndroidResources = true
+  }
 }
 
 ksp {
@@ -19,4 +23,10 @@ dependencies {
   ksp(libs.androidx.room.compiler)
   implementation(libs.androidx.datastore.preferences)
   implementation(libs.kotlinx.datetime)
+
+  testImplementation(libs.junit)
+  testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(libs.turbine)
+  testImplementation(libs.robolectric)
+  testImplementation(libs.androidx.test.core)
 }
