@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Top App Bar navigation / actions -->
+  <string name="counter_back_description">Назад</string>
+  <string name="counter_edit_description">Редактировать</string>
+  <string name="counter_more_description">Ещё</string>
+
+  <!-- Header labels -->
+  <!-- AC-CL-14: "ДО СОБЫТИЯ" label above the event title on the upcoming counter. -->
+  <string name="counter_label_until">ДО СОБЫТИЯ</string>
+  <!-- Past counter header label -->
+  <string name="counter_label_since">ПРОШЛО</string>
+
+  <!-- More-menu items -->
+  <string name="counter_menu_delete">Удалить</string>
+
+  <!-- Glass-row unit label caps (AC-CL-9: unit label in CAPS below the number) -->
+  <string name="counter_unit_years">ЛЕТ</string>
+  <string name="counter_unit_days">ДНЕЙ</string>
+  <string name="counter_unit_hours">ЧАС</string>
+  <string name="counter_unit_minutes">МИН</string>
+  <string name="counter_unit_seconds">СЕК</string>
+
+  <!-- Today label for past breakdown (when daysAgo == 0) -->
+  <string name="counter_past_today">Сегодня</string>
+
+  <!-- Accessibility phrases for the primary number block (AC-CL-19).
+       %1$s is the pluralized time value ("3 дня", "9 лет" и т. д.). -->
+  <string name="counter_a11y_until">%1$s до события</string>
+  <string name="counter_a11y_since">Прошло %1$s</string>
+  <string name="counter_a11y_today">Сегодня</string>
+
+  <!-- Event icon content description: %s = icon symbol name (e.g. "Celebration") -->
+  <string name="counter_icon_description">Иконка %s</string>
+
+  <!-- NotFound state -->
+  <string name="counter_not_found_message">Событие не найдено</string>
+  <string name="counter_not_found_back">Вернуться назад</string>
+
+  <!-- Error state -->
+  <string name="counter_error_message">Не удалось загрузить событие. Попробуйте ещё раз.</string>
+</resources>

@@ -2,6 +2,7 @@
 
 package com.datecountdown.app.feature.counter
 
+import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -33,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +43,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -71,6 +75,8 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toJavaLocalDateTime
 import kotlinx.datetime.toLocalDateTime
+import androidx.core.graphics.ColorUtils
+import androidx.core.view.WindowCompat
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.time.Duration.Companion.days
@@ -186,20 +192,38 @@ private fun UpcomingCounter(
   // AC-CL-18: amber (0=ORANGE, 8=AMBER) are light palettes — add scrim to maintain contrast.
   val needsScrim = event.color == EventColor.ORANGE || event.color == EventColor.AMBER
 
+  // Edge-to-edge: requires Activity.enableEdgeToEdge() in :app/MainActivity.kt (already present).
+  // Status/navigation bars are colored to match palette.hero so they blend into the background.
+  // Light-icon / dark-icon selection uses luminance: hero luminance > 0.5 → light bg → dark icons.
+  val view = LocalView.current
+  if (!view.isInEditMode) {
+    val heroArgb = palette.hero.toArgb()
+    val useLightIcons = ColorUtils.calculateLuminance(heroArgb) <= 0.5
+    SideEffect {
+      val window = (view.context as? Activity)?.window ?: return@SideEffect
+      @Suppress("DEPRECATION")
+      window.statusBarColor = heroArgb
+      @Suppress("DEPRECATION")
+      window.navigationBarColor = heroArgb
+      val insetsController = WindowCompat.getInsetsController(window, view)
+      insetsController.isAppearanceLightStatusBars = !useLightIcons
+      insetsController.isAppearanceLightNavigationBars = !useLightIcons
+    }
+  }
+
   Box(
     modifier = modifier
       .fillMaxSize()
       .background(palette.hero),
   ) {
-    // Background blob decorations — purely decorative, no contentDescription.
+    // Background blob decorations — purely decorative, excluded from accessibility tree.
     Box(
       modifier = Modifier
         .size(200.dp)
         .offset(x = 120.dp, y = (-60).dp)
         .align(Alignment.TopEnd)
         .clip(BlobShape.Variant2)
-        .background(palette.container.copy(alpha = 0.3f))
-        .semantics { contentDescription = "" },
+        .background(palette.container.copy(alpha = 0.3f)),
     )
     Box(
       modifier = Modifier
@@ -207,8 +231,7 @@ private fun UpcomingCounter(
         .offset(x = (-80).dp, y = 60.dp)
         .align(Alignment.BottomStart)
         .clip(BlobShape.Variant3)
-        .background(palette.container.copy(alpha = 0.2f))
-        .semantics { contentDescription = "" },
+        .background(palette.container.copy(alpha = 0.2f)),
     )
 
     Scaffold(
@@ -279,20 +302,36 @@ private fun PastCounter(
     eventPaletteByIndex(index = event.color.ordinal, dark = isDark)
   }
 
+  // Edge-to-edge: system bars colored to match palette.hero (same logic as UpcomingCounter).
+  val view = LocalView.current
+  if (!view.isInEditMode) {
+    val heroArgb = palette.hero.toArgb()
+    val useLightIcons = ColorUtils.calculateLuminance(heroArgb) <= 0.5
+    SideEffect {
+      val window = (view.context as? Activity)?.window ?: return@SideEffect
+      @Suppress("DEPRECATION")
+      window.statusBarColor = heroArgb
+      @Suppress("DEPRECATION")
+      window.navigationBarColor = heroArgb
+      val insetsController = WindowCompat.getInsetsController(window, view)
+      insetsController.isAppearanceLightStatusBars = !useLightIcons
+      insetsController.isAppearanceLightNavigationBars = !useLightIcons
+    }
+  }
+
   Box(
     modifier = modifier
       .fillMaxSize()
       .background(palette.hero),
   ) {
-    // Decorative background blobs.
+    // Decorative background blobs — excluded from accessibility tree.
     Box(
       modifier = Modifier
         .size(200.dp)
         .offset(x = 120.dp, y = (-60).dp)
         .align(Alignment.TopEnd)
         .clip(BlobShape.Variant2)
-        .background(palette.container.copy(alpha = 0.3f))
-        .semantics { contentDescription = "" },
+        .background(palette.container.copy(alpha = 0.3f)),
     )
     Box(
       modifier = Modifier
@@ -300,8 +339,7 @@ private fun PastCounter(
         .offset(x = (-80).dp, y = 60.dp)
         .align(Alignment.BottomStart)
         .clip(BlobShape.Variant3)
-        .background(palette.container.copy(alpha = 0.2f))
-        .semantics { contentDescription = "" },
+        .background(palette.container.copy(alpha = 0.2f)),
     )
 
     Scaffold(
@@ -447,8 +485,7 @@ private fun CounterHeader(
       modifier = Modifier
         .size(72.dp)
         .clip(BlobShape.Variant4)
-        .background(palette.container)
-        .semantics { contentDescription = "" },
+        .background(palette.container),
       contentAlignment = Alignment.Center,
     ) {
       EventSymbol(
