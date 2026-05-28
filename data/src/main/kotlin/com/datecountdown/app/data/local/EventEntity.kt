@@ -12,8 +12,12 @@ import androidx.room.PrimaryKey
  * so that future reordering of [com.datecountdown.app.domain.EventColor] /
  * [com.datecountdown.app.domain.EventIcon] entries does not corrupt persisted data.
  */
+// Promoted to public because EventDao (also public for Metro AppGraph access) exposes
+// EventEntity in its method signatures, and Kotlin forbids a public declaration from
+// referencing an internal type. EventEntity itself is a Room storage detail and carries
+// no public API contract — it should not be used outside :data.
 @Entity(tableName = "events")
-internal data class EventEntity(
+data class EventEntity(
   @PrimaryKey
   val id: String,
   val title: String,

@@ -14,7 +14,9 @@ import androidx.room.RoomDatabase
   version = 1,
   exportSchema = true,
 )
-internal abstract class AppDatabase : RoomDatabase() {
+// Promoted to public so the Metro AppGraph in :app can call databaseBuilder and eventDao().
+// EventEntity stays internal — it is only referenced inside :data's mapper.
+abstract class AppDatabase : RoomDatabase() {
 
   abstract fun eventDao(): EventDao
 

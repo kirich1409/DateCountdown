@@ -11,7 +11,8 @@ import kotlinx.coroutines.flow.Flow
  * [upsert] handles both add and update in a single call (AC-DM-6). Physical delete (no soft-delete flag).
  */
 @Dao
-internal interface EventDao {
+// Promoted to public so AppDatabase.eventDao() is accessible from :app's Metro graph.
+interface EventDao {
 
   @Query("SELECT * FROM events")
   fun observeAll(): Flow<List<EventEntity>>
