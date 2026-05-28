@@ -16,6 +16,7 @@ import com.datecountdown.app.domain.PastEventProcessor
 import com.datecountdown.app.domain.usecase.DeleteEventUseCase
 import com.datecountdown.app.domain.usecase.GetEventUseCase
 import com.datecountdown.app.domain.usecase.GetEventsUseCase
+import com.datecountdown.app.domain.usecase.SaveEventUseCase
 import com.datecountdown.app.navigation.RootComponent
 import dev.zacsweers.metro.createGraphFactory
 
@@ -48,6 +49,10 @@ class MainActivity : ComponentActivity() {
       scheduler = graph.notificationScheduler,
     )
     val getEvent = GetEventUseCase(repo = graph.eventsRepository)
+    val saveEvent = SaveEventUseCase(
+      repo = graph.eventsRepository,
+      scheduler = graph.notificationScheduler,
+    )
     val calculator = CountdownCalculator()
     val pastProcessor = PastEventProcessor()
 
@@ -58,6 +63,7 @@ class MainActivity : ComponentActivity() {
       getEvents = getEvents,
       deleteEvent = deleteEvent,
       getEvent = getEvent,
+      saveEvent = saveEvent,
       calculator = calculator,
       pastProcessor = pastProcessor,
       notificationScheduler = graph.notificationScheduler,

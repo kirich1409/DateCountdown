@@ -60,6 +60,10 @@ dependencies {
   implementation(libs.mvikotlin)
   implementation(libs.mvikotlin.main)
 
+  // kotlinx-datetime is an implementation dep in :domain and therefore not visible here.
+  // RootComponent passes Clock to DefaultAddEditComponent, so we declare it explicitly.
+  implementation(libs.kotlinx.datetime)
+
   // Design system — theme, colors, typography
   implementation(project(":core:design"))
 
