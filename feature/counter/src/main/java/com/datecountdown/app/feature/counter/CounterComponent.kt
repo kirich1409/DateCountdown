@@ -38,6 +38,9 @@ interface CounterComponent {
   /** User confirmed deletion of the current event. */
   fun onDeleteClick()
 
+  /** User tapped the reschedule button on the past counter — open the edit sheet to reschedule. */
+  fun onRescheduleClick()
+
   /**
    * Navigation outputs from the counter screen.
    *
@@ -46,6 +49,9 @@ interface CounterComponent {
   sealed interface Output {
     /** Open the edit sheet for [eventId]. */
     data class EditEvent(val eventId: String) : Output
+
+    /** Open the edit sheet to reschedule the past event [eventId] (AC-PE-13). */
+    data class RescheduleEvent(val eventId: String) : Output
 
     /** Pop the counter screen from the primary stack. */
     data object NavigateBack : Output
@@ -129,5 +135,9 @@ class DefaultCounterComponent(
 
   override fun onDeleteClick() {
     store.accept(CounterStore.Intent.Delete)
+  }
+
+  override fun onRescheduleClick() {
+    output(CounterComponent.Output.RescheduleEvent(eventId = eventId))
   }
 }

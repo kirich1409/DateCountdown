@@ -19,14 +19,23 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,7 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,7 +69,6 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.datecountdown.app.core.common.R as CommonR
 import com.datecountdown.app.core.design.theme.BlobShape
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
-import com.datecountdown.app.core.design.theme.EventPaletteId
 import com.datecountdown.app.core.design.theme.GlassSurface
 import com.datecountdown.app.core.design.theme.EventIcon as DesignEventIcon
 import com.datecountdown.app.core.design.theme.EventSymbol
@@ -133,11 +141,20 @@ internal fun CounterScreen(
   BackHandler { component.onBackClick() }
 
   val state by component.state.subscribeAsState()
+
+  // Stable lambda refs: method references on a Decompose component are not stable across
+  // recompositions — wrap in remember(component) so downstream composables can skip correctly.
+  val onBackClick = remember(component) { component::onBackClick }
+  val onEditClick = remember(component) { component::onEditClick }
+  val onDeleteClick = remember(component) { component::onDeleteClick }
+  val onRescheduleClick = remember(component) { component::onRescheduleClick }
+
   CounterScreenContent(
     state = state,
-    onBackClick = component::onBackClick,
-    onEditClick = component::onEditClick,
-    onDeleteClick = component::onDeleteClick,
+    onBackClick = onBackClick,
+    onEditClick = onEditClick,
+    onDeleteClick = onDeleteClick,
+    onRescheduleClick = onRescheduleClick,
     modifier = modifier,
   )
 }
@@ -158,6 +175,7 @@ private fun CounterScreenContent(
   onBackClick: () -> Unit,
   onEditClick: () -> Unit,
   onDeleteClick: () -> Unit,
+  onRescheduleClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   when (state) {
@@ -188,6 +206,7 @@ private fun CounterScreenContent(
       breakdown = state.breakdown,
       onBackClick = onBackClick,
       onDeleteClick = onDeleteClick,
+      onRescheduleClick = onRescheduleClick,
       modifier = modifier,
     )
   }
@@ -227,10 +246,13 @@ private fun UpcomingCounter(
   // Light-icon / dark-icon selection uses luminance: hero luminance > 0.5 → light bg → dark icons.
   val view = LocalView.current
   if (!view.isInEditMode) {
-    val heroArgb = palette.hero.toArgb()
-    val useLightIcons = ColorUtils.calculateLuminance(heroArgb) <= 0.5
-    SideEffect {
-      val window = (view.context as? Activity)?.window ?: return@SideEffect
+    // LaunchedEffect(palette.hero) instead of SideEffect: hero changes only on color change, not
+    // every tick. SideEffect ran JNI window calls on every recomposition (1 Hz); LaunchedEffect
+    // defers to the coroutine dispatcher and only restarts when the hero color actually changes.
+    LaunchedEffect(palette.hero) {
+      val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
+      val heroArgb = palette.hero.toArgb()
+      val useLightIcons = ColorUtils.calculateLuminance(heroArgb) <= 0.5
       // window.statusBarColor / navigationBarColor are deprecated in API 35.
       // Kept until the project migrates to a WindowInsetsController-only path; current
       // edge-to-edge hero tinting requires window-color compat for API 29..34. The modern
@@ -257,6 +279,7 @@ private fun UpcomingCounter(
       topBar = {
         CounterTopBar(
           showEdit = true,
+          showMore = true,
           onHeroColor = palette.onHero,
           onBackClick = onBackClick,
           onEditClick = onEditClick,
@@ -304,7 +327,11 @@ private fun UpcomingCounter(
 /**
  * Full-screen past counter composable.
  *
- * AC-CL-13: past top bar has only arrow_back and more_vert (no edit button).
+ * AC-PE-6: background is surfaceContainerHighest (neutral graphite), not the event palette hero.
+ * AC-PE-7: errorContainer chip "СОБЫТИЕ В ПРОШЛОМ", event title, date string.
+ * AC-PE-8: large −N / "Сегодня" with autosize, "N дней назад" label below.
+ * AC-PE-9: Reschedule + Delete buttons at the bottom.
+ * AC-PE-10: top bar shows arrow_back only (more_vert hidden — Delete is explicit on screen).
  */
 @Suppress("LongParameterList", "LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -314,49 +341,53 @@ private fun PastCounter(
   breakdown: PastBreakdown,
   onBackClick: () -> Unit,
   onDeleteClick: () -> Unit,
+  onRescheduleClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val isDark = isSystemInDarkTheme()
-  val palette = remember(event.color.ordinal, isDark) {
-    eventPaletteByIndex(index = event.color.ordinal, dark = isDark)
-  }
+  val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHighest
 
-  // Edge-to-edge: system bars colored to match palette.hero (same logic as UpcomingCounter).
+  // Edge-to-edge: past screen uses neutral surface color, not the event palette hero.
   val view = LocalView.current
   if (!view.isInEditMode) {
-    val heroArgb = palette.hero.toArgb()
-    val useLightIcons = ColorUtils.calculateLuminance(heroArgb) <= 0.5
-    SideEffect {
-      val window = (view.context as? Activity)?.window ?: return@SideEffect
+    LaunchedEffect(surfaceColor) {
+      val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
+      val surfaceArgb = surfaceColor.toArgb()
+      val useLightIcons = ColorUtils.calculateLuminance(surfaceArgb) <= 0.5
       // window.statusBarColor / navigationBarColor are deprecated in API 35.
       // Kept until the project migrates to a WindowInsetsController-only path; current
-      // edge-to-edge hero tinting requires window-color compat for API 29..34. The modern
-      // alternative (transparent bars + bar-controller alone) is an app-level decision
-      // that is out of scope for this feature screen.
+      // edge-to-edge tinting requires window-color compat for API 29..34.
       @Suppress("DEPRECATION")
-      window.statusBarColor = heroArgb
+      window.statusBarColor = surfaceArgb
       @Suppress("DEPRECATION")
-      window.navigationBarColor = heroArgb
+      window.navigationBarColor = surfaceArgb
       val insetsController = WindowCompat.getInsetsController(window, view)
       insetsController.isAppearanceLightStatusBars = !useLightIcons
       insetsController.isAppearanceLightNavigationBars = !useLightIcons
     }
   }
 
+  val designIcon = DesignEventIcon.entries[event.icon.ordinal]
+  val formattedDate = remember(event.targetDateTime) {
+    event.targetDateTime
+      .toLocalDateTime(TimeZone.currentSystemDefault())
+      .toJavaLocalDateTime()
+      .format(dateChipFormatter)
+  }
+
   Box(
     modifier = modifier
       .fillMaxSize()
-      .background(palette.hero),
+      .background(surfaceColor),
   ) {
-    CounterBlobDecorations(palette = palette)
-
     Scaffold(
       topBar = {
+        // AC-PE-10: more_vert hidden on past — Delete is already an explicit bottom button.
         CounterTopBar(
           showEdit = false,
-          onHeroColor = palette.onHero,
+          showMore = false,
+          onHeroColor = MaterialTheme.colorScheme.onSurface,
           onBackClick = onBackClick,
-          onEditClick = {},
+          onEditClick = {},  // no-op: edit button is hidden (showEdit = false)
           onDeleteClick = onDeleteClick,
         )
       },
@@ -365,26 +396,123 @@ private fun PastCounter(
       Column(
         modifier = Modifier
           .fillMaxSize()
-          .padding(innerPadding)
-          .padding(horizontal = 24.dp),
+          .padding(innerPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp),
       ) {
         Spacer(modifier = Modifier.height(8.dp))
 
-        CounterHeader(
-          event = event,
-          headerLabel = stringResource(R.string.counter_label_since),
-          palette = palette,
-          onHeroColor = palette.onHero,
-        )
+        // Header: muted blob icon + past-event chip + title + date
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          // AC-PE-6: priглушённая blob-иконка — surfaceContainerHigh bg, onSurfaceVariant tint.
+          Box(
+            modifier = Modifier
+              .size(72.dp)
+              .clip(BlobShape.Variant4)
+              .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+          ) {
+            EventSymbol(
+              icon = designIcon,
+              size = 36.sp,
+              tint = MaterialTheme.colorScheme.onSurfaceVariant,
+              contentDescription = stringResource(
+                R.string.counter_icon_description,
+                designIcon.symbolName,
+              ),
+            )
+          }
 
+          // AC-PE-7: chip "СОБЫТИЕ В ПРОШЛОМ" with errorContainer colors.
+          @Suppress("EmptyFunctionBlock")
+          AssistChip(
+            onClick = {},  // non-interactive — visual status chip only (AC-PE-17)
+            label = { Text(stringResource(R.string.counter_chip_past)) },
+            colors = AssistChipDefaults.assistChipColors(
+              containerColor = MaterialTheme.colorScheme.errorContainer,
+              labelColor = MaterialTheme.colorScheme.onErrorContainer,
+            ),
+          )
+
+          Text(
+            text = event.title,
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+          )
+
+          Text(
+            text = formattedDate,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // AC-PE-8: large primary number with autosize.
         PastPrimary(
           breakdown = breakdown,
-          onHeroColor = palette.onHero,
+          onSurfaceColor = MaterialTheme.colorScheme.onSurface,
+          modifier = Modifier.padding(horizontal = 24.dp),
         )
 
         Spacer(modifier = Modifier.weight(1f))
+
+        // AC-PE-9: Reschedule + Delete buttons.
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 24.dp),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          val rescheduleDesc = stringResource(R.string.counter_a11y_reschedule)
+          FilledTonalButton(
+            onClick = onRescheduleClick,
+            modifier = Modifier
+              .weight(1f)
+              .semantics { contentDescription = rescheduleDesc },
+            colors = ButtonDefaults.filledTonalButtonColors(
+              containerColor = MaterialTheme.colorScheme.secondaryContainer,
+              contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
+          ) {
+            Icon(
+              imageVector = Icons.Filled.Refresh,
+              contentDescription = null,  // decorative — button contentDescription covers semantics
+              modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.counter_reschedule_button))
+          }
+
+          val deleteDesc = stringResource(R.string.counter_a11y_delete)
+          Button(
+            onClick = onDeleteClick,
+            modifier = Modifier
+              .weight(1f)
+              .semantics { contentDescription = deleteDesc },
+            colors = ButtonDefaults.buttonColors(
+              containerColor = MaterialTheme.colorScheme.errorContainer,
+              contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            ),
+          ) {
+            Icon(
+              imageVector = Icons.Filled.Delete,
+              contentDescription = null,  // decorative — button contentDescription covers semantics
+              modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.counter_delete_button))
+          }
+        }
       }
     }
   }
@@ -395,7 +523,8 @@ private fun PastCounter(
 /**
  * Transparent top bar for both upcoming and past counter screens.
  *
- * AC-CL-13: upcoming has arrow_back + edit + more_vert; past has arrow_back + more_vert only.
+ * AC-CL-13: upcoming has arrow_back + edit + more_vert (showEdit=true, showMore=true).
+ * AC-PE-10: past has arrow_back only (showEdit=false, showMore=false) — Delete is on-screen.
  * AC-CL-17: all icons carry contentDescriptions.
  */
 @Suppress("LongParameterList")
@@ -408,6 +537,7 @@ private fun CounterTopBar(
   onEditClick: () -> Unit,
   onDeleteClick: () -> Unit,
   modifier: Modifier = Modifier,
+  showMore: Boolean = true,
 ) {
   var menuExpanded by remember { mutableStateOf(false) }
 
@@ -437,25 +567,28 @@ private fun CounterTopBar(
         }
       }
 
-      Box {
-        IconButton(onClick = { menuExpanded = true }) {
-          Icon(
-            imageVector = Icons.Filled.MoreVert,
-            contentDescription = stringResource(R.string.counter_more_description),
-          )
-        }
+      // AC-PE-10: share intentionally omitted from MVP top bar (mockups show it, spec is the contract).
+      if (showMore) {
+        Box {
+          IconButton(onClick = { menuExpanded = true }) {
+            Icon(
+              imageVector = Icons.Filled.MoreVert,
+              contentDescription = stringResource(R.string.counter_more_description),
+            )
+          }
 
-        DropdownMenu(
-          expanded = menuExpanded,
-          onDismissRequest = { menuExpanded = false },
-        ) {
-          DropdownMenuItem(
-            text = { Text(stringResource(R.string.counter_menu_delete)) },
-            onClick = {
-              menuExpanded = false
-              onDeleteClick()
-            },
-          )
+          DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+          ) {
+            DropdownMenuItem(
+              text = { Text(stringResource(R.string.counter_menu_delete)) },
+              onClick = {
+                menuExpanded = false
+                onDeleteClick()
+              },
+            )
+          }
         }
       }
     },
@@ -504,10 +637,11 @@ private fun CounterHeader(
       )
     }
 
+    // B6: alpha lifted from 0.7 to 0.85 — 0.7 fails 4.5:1 on light hero palettes (amber/orange).
     Text(
       text = headerLabel,
       style = MaterialTheme.typography.labelSmall,
-      color = onHeroColor.copy(alpha = 0.7f),
+      color = onHeroColor.copy(alpha = 0.85f),
       letterSpacing = 2.sp,
     )
 
@@ -532,6 +666,8 @@ private fun CounterHeader(
  * Date chip displaying the event's target date/time.
  *
  * AC-CL-14: format "30 апреля 2026 · 11:00" — full date with month name and wall-clock time.
+ * Uses AssistChip for Material 3 chip styling. Non-interactive — clearAndSetSemantics exposes
+ * the date text without announcing it as a button (AC-PE-17).
  */
 @Composable
 private fun CounterDateChip(
@@ -547,18 +683,18 @@ private fun CounterDateChip(
       .format(dateChipFormatter)
   }
 
-  Surface(
-    modifier = modifier,
-    shape = MaterialTheme.shapes.medium,
-    color = containerColor,
-  ) {
-    Text(
-      text = formattedDate,
-      modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-      style = MaterialTheme.typography.bodySmall,
-      color = onHeroColor,
-    )
-  }
+  @Suppress("EmptyFunctionBlock")
+  AssistChip(
+    onClick = {},  // no-op: visual chip only — clearAndSetSemantics neutralises the click role
+    label = { Text(text = formattedDate, style = MaterialTheme.typography.bodySmall) },
+    modifier = modifier.semantics(mergeDescendants = false) {
+      contentDescription = formattedDate
+    },
+    colors = AssistChipDefaults.assistChipColors(
+      containerColor = containerColor,
+      labelColor = onHeroColor,
+    ),
+  )
 }
 
 // ── Primary number display ────────────────────────────────────────────────────────────────────────
@@ -568,10 +704,10 @@ private fun CounterDateChip(
  *
  * AC-CL-4: primary=YEARS shows years (large) + days (smaller) in a column.
  * AC-CL-5/6: all other primaries show one large number with pluralised label below.
+ * AC-CL-15: BasicText + TextAutoSize.StepBased clamps the primary number between 48sp and 96sp
+ *   so it never overflows at large fontScale values.
  * AC-CL-19: the whole block is wrapped with [semantics(mergeDescendants=true)] and a
  * descriptive [contentDescription] so TalkBack reads "3 days until event", not digit-by-digit.
- *
- * TODO (AC-CL-15): apply auto-size / clamped sp to prevent primary number overflow at max fontScale.
  */
 @Suppress("LongMethod")
 @Composable
@@ -600,11 +736,14 @@ private fun CounterPrimary(
             count = countdown.years,
             countdown.years,
           )
-          Text(
+          // AC-CL-15: autosize clamps displayLarge between 48sp..96sp.
+          BasicText(
             text = yearsLabel,
-            style = MaterialTheme.typography.displayLarge,
-            color = onHeroColor,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.displayLarge.copy(
+              fontWeight = FontWeight.Bold,
+              color = onHeroColor,
+            ),
+            autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
           )
           val daysLabel = pluralStringResource(
             id = CommonR.plurals.time_unit_day,
@@ -625,11 +764,14 @@ private fun CounterPrimary(
           count = countdown.days,
           countdown.days,
         )
-        Text(
+        // AC-CL-15: autosize clamps displayLarge between 48sp..96sp.
+        BasicText(
           text = label,
-          style = MaterialTheme.typography.displayLarge,
-          color = onHeroColor,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.displayLarge.copy(
+            fontWeight = FontWeight.Bold,
+            color = onHeroColor,
+          ),
+          autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
         )
       }
 
@@ -639,11 +781,13 @@ private fun CounterPrimary(
           count = countdown.hours,
           countdown.hours,
         )
-        Text(
+        BasicText(
           text = label,
-          style = MaterialTheme.typography.displayLarge,
-          color = onHeroColor,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.displayLarge.copy(
+            fontWeight = FontWeight.Bold,
+            color = onHeroColor,
+          ),
+          autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
         )
       }
 
@@ -653,11 +797,13 @@ private fun CounterPrimary(
           count = countdown.minutes,
           countdown.minutes,
         )
-        Text(
+        BasicText(
           text = label,
-          style = MaterialTheme.typography.displayLarge,
-          color = onHeroColor,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.displayLarge.copy(
+            fontWeight = FontWeight.Bold,
+            color = onHeroColor,
+          ),
+          autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
         )
       }
 
@@ -667,11 +813,13 @@ private fun CounterPrimary(
           count = countdown.seconds,
           countdown.seconds,
         )
-        Text(
+        BasicText(
           text = label,
-          style = MaterialTheme.typography.displayLarge,
-          color = onHeroColor,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.displayLarge.copy(
+            fontWeight = FontWeight.Bold,
+            color = onHeroColor,
+          ),
+          autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
         )
       }
     }
@@ -681,13 +829,16 @@ private fun CounterPrimary(
 /**
  * Primary past display block.
  *
- * AC-PE-11: when breakdown is [PastBreakdown.Today], shows "Today" (no number).
- * Otherwise shows "[N] days ago" from [PastBreakdown.DaysAgo.days].
+ * AC-PE-8: large −N (or "Сегодня" when DaysAgo == 0 is expressed as Today) with autosize,
+ * secondary "N дней назад" label below for DaysAgo case.
+ * AC-PE-11: Today → large "Сегодня" only; no secondary label.
+ * AC-PE-16: BasicText + TextAutoSize.StepBased prevents overflow at max fontScale.
+ * AC-PE-17: semantics mergeDescendants so TalkBack reads the whole block as one unit.
  */
 @Composable
 private fun PastPrimary(
   breakdown: PastBreakdown,
-  onHeroColor: Color,
+  onSurfaceColor: Color,
   modifier: Modifier = Modifier,
 ) {
   val a11yDescription = buildPastA11yDescription(breakdown)
@@ -700,26 +851,43 @@ private fun PastPrimary(
   ) {
     when (breakdown) {
       PastBreakdown.Today -> {
-        Text(
+        // AC-PE-11: event happened today — show "Сегодня", no number, no secondary label.
+        BasicText(
           text = stringResource(R.string.counter_past_today),
-          style = MaterialTheme.typography.displayLarge,
-          color = onHeroColor,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.displayLarge.copy(
+            fontWeight = FontWeight.Bold,
+            color = onSurfaceColor,
+          ),
+          autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
         )
       }
 
       is PastBreakdown.DaysAgo -> {
-        val label = pluralStringResource(
-          id = CommonR.plurals.days_ago,
-          count = breakdown.days,
-          breakdown.days,
-        )
-        Text(
-          text = label,
-          style = MaterialTheme.typography.displayLarge,
-          color = onHeroColor,
-          fontWeight = FontWeight.Bold,
-        )
+        Column(
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+          // AC-PE-8: large "−N" number.
+          BasicText(
+            text = "−${breakdown.days}",
+            style = MaterialTheme.typography.displayLarge.copy(
+              fontWeight = FontWeight.Bold,
+              color = onSurfaceColor,
+            ),
+            autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
+          )
+          // AC-PE-8: secondary "N дней назад" label.
+          val daysAgoLabel = pluralStringResource(
+            id = CommonR.plurals.days_ago,
+            count = breakdown.days,
+            breakdown.days,
+          )
+          Text(
+            text = daysAgoLabel,
+            style = MaterialTheme.typography.headlineSmall,
+            color = onSurfaceColor.copy(alpha = 0.7f),
+          )
+        }
       }
     }
   }
@@ -820,6 +988,8 @@ private fun GlassCell(
       verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
       // AC-CL-9: leading-zero format "02", "08". Locale.ROOT ensures ASCII digits in all locales.
+      // AC-CL-9: unit labels are short genitive plural CAPS forms ("ЧАСОВ"/"МИНУТ"/"СЕКУНД").
+      //   Per design, all values share one abbreviation regardless of grammatical number.
       Text(
         text = String.format(Locale.ROOT, "%02d", value),
         style = MaterialTheme.typography.headlineLarge,
@@ -967,6 +1137,7 @@ private fun CounterLoadingPreview() {
       onBackClick = {},
       onEditClick = {},
       onDeleteClick = {},
+      onRescheduleClick = {},
     )
   }
 }
@@ -991,6 +1162,7 @@ private fun CounterUpcomingYearsDaysPreview() {
       onBackClick = {},
       onEditClick = {},
       onDeleteClick = {},
+      onRescheduleClick = {},
     )
   }
 }
@@ -1015,6 +1187,7 @@ private fun CounterUpcomingTodayHoursPreview() {
       onBackClick = {},
       onEditClick = {},
       onDeleteClick = {},
+      onRescheduleClick = {},
     )
   }
 }
@@ -1032,6 +1205,7 @@ private fun CounterPastPreview() {
       onBackClick = {},
       onEditClick = {},
       onDeleteClick = {},
+      onRescheduleClick = {},
     )
   }
 }
@@ -1049,6 +1223,7 @@ private fun CounterPastTodayPreview() {
       onBackClick = {},
       onEditClick = {},
       onDeleteClick = {},
+      onRescheduleClick = {},
     )
   }
 }

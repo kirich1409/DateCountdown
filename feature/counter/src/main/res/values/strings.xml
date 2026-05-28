@@ -14,12 +14,13 @@
   <!-- More-menu items -->
   <string name="counter_menu_delete">Delete</string>
 
-  <!-- Glass-row unit label caps (AC-CL-9: unit label in CAPS below the number) -->
+  <!-- Glass-row unit label caps (AC-CL-9: unit label in CAPS below the number).
+       Short genitive plural forms — all values share one abbreviation per unit. -->
   <string name="counter_unit_years">YEARS</string>
   <string name="counter_unit_days">DAYS</string>
-  <string name="counter_unit_hours">HRS</string>
-  <string name="counter_unit_minutes">MIN</string>
-  <string name="counter_unit_seconds">SEC</string>
+  <string name="counter_unit_hours">HOURS</string>
+  <string name="counter_unit_minutes">MINUTES</string>
+  <string name="counter_unit_seconds">SECONDS</string>
 
   <!-- Today label for past breakdown (when daysAgo == 0) -->
   <string name="counter_past_today">Today</string>
@@ -39,4 +40,11 @@
 
   <!-- Error state -->
   <string name="counter_error_message">Failed to load event. Please try again.</string>
+
+  <!-- Past counter: chip, action buttons, accessibility (AC-PE-7, AC-PE-9, AC-PE-17) -->
+  <string name="counter_chip_past">PAST EVENT</string>
+  <string name="counter_reschedule_button">Reschedule</string>
+  <string name="counter_delete_button">Delete</string>
+  <string name="counter_a11y_reschedule">Reschedule event</string>
+  <string name="counter_a11y_delete">Delete event</string>
 </resources>
