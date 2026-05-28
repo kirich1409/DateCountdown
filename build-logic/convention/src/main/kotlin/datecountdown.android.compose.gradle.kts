@@ -24,4 +24,9 @@ extensions.configure<ComposeCompilerGradlePluginExtension> {
   val composeReports = layout.buildDirectory.dir("compose-compiler")
   reportsDestination.set(composeReports)
   metricsDestination.set(composeReports)
+  stabilityConfigurationFiles.add(
+    isolated.rootProject.projectDirectory.file(
+      "build-logic/convention/src/main/kotlin/compose-stability-config.conf"
+    )
+  )
 }

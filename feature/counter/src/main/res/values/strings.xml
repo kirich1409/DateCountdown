@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Top App Bar navigation / actions -->
+  <string name="counter_back_description">Back</string>
+  <string name="counter_edit_description">Edit</string>
+  <string name="counter_more_description">More</string>
+
+  <!-- Header labels -->
+  <!-- AC-CL-14: "ДО СОБЫТИЯ" label above the event title on the upcoming counter. -->
+  <string name="counter_label_until">UNTIL</string>
+  <!-- Past counter header label -->
+  <string name="counter_label_since">SINCE</string>
+
+  <!-- More-menu items -->
+  <string name="counter_menu_delete">Delete</string>
+
+  <!-- Glass-row unit label caps (AC-CL-9: unit label in CAPS below the number).
+       Short genitive plural forms — all values share one abbreviation per unit. -->
+  <string name="counter_unit_years">YEARS</string>
+  <string name="counter_unit_days">DAYS</string>
+  <string name="counter_unit_hours">HOURS</string>
+  <string name="counter_unit_minutes">MINUTES</string>
+  <string name="counter_unit_seconds">SECONDS</string>
+
+  <!-- Today label for past breakdown (when daysAgo == 0) -->
+  <string name="counter_past_today">Today</string>
+
+  <!-- Accessibility phrases for the primary number block (AC-CL-19).
+       %1$s is the pluralized time value ("3 days", "9 years", etc.). -->
+  <string name="counter_a11y_until">%1$s until event</string>
+  <string name="counter_a11y_since">%1$s ago</string>
+  <string name="counter_a11y_today">Today</string>
+
+  <!-- Event icon content description: %s = icon symbol name (e.g. "Celebration") -->
+  <string name="counter_icon_description">%s icon</string>
+
+  <!-- NotFound state -->
+  <string name="counter_not_found_message">Event not found</string>
+  <string name="counter_not_found_back">Go back</string>
+
+  <!-- Error state -->
+  <string name="counter_error_message">Failed to load event. Please try again.</string>
+
+  <!-- Past counter: chip, action buttons, accessibility (AC-PE-7, AC-PE-9, AC-PE-17) -->
+  <string name="counter_chip_past">PAST EVENT</string>
+  <string name="counter_reschedule_button">Reschedule</string>
+  <string name="counter_delete_button">Delete</string>
+  <string name="counter_a11y_reschedule">Reschedule event</string>
+  <string name="counter_a11y_delete">Delete event</string>
+</resources>

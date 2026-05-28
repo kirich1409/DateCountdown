@@ -239,6 +239,10 @@ class RootComponent(
   private fun onCounterOutput(output: CounterComponent.Output) {
     when (output) {
       is CounterComponent.Output.EditEvent -> showEdit(output.eventId)
+      // AC-PE-13: «Перенести» opens the edit screen pre-filled with this event.
+      // Once the user saves with a future date, the event becomes upcoming and the
+      // notification is rescheduled. Navigation path is identical to EditEvent.
+      is CounterComponent.Output.RescheduleEvent -> showEdit(output.eventId)
       CounterComponent.Output.NavigateBack -> stackNavigation.pop()
     }
   }
