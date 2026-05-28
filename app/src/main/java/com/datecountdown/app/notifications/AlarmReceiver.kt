@@ -18,7 +18,10 @@ import dev.zacsweers.metro.createGraphFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Receives exact alarm broadcasts fired by [android.app.AlarmManager] for scheduled events
@@ -79,8 +82,12 @@ class AlarmReceiver : BroadcastReceiver() {
 
     CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
       try {
+        // Idempotent — zero-cost when channel already exists. Guards the rare case where
+        // BootReceiver fires before MainActivity has ever run and the channel is not yet created.
+        NotificationChannels.ensureChannel(appContext)
+
         val graph = createGraphFactory<AppGraph.Factory>().create(appContext as Application)
-        val event = graph.eventsRepository.getById(EventId(eventIdValue))
+        val event = withTimeout(8.seconds) { graph.eventsRepository.getById(EventId(eventIdValue)) }
 
         if (event == null) {
           // Event was deleted after alarm was scheduled — silent no-op (AC-NT-4).
@@ -129,6 +136,8 @@ class AlarmReceiver : BroadcastReceiver() {
         NotificationManagerCompat.from(appContext).notify(notificationId, notification)
         // AC-NT-15: log only eventId, never event.title.
         Log.i(TAG, "Notification posted, eventId=$eventIdValue")
+      } catch (e: TimeoutCancellationException) {
+        Log.w(TAG, "Repository lookup timed out for eventId=$eventIdValue — no notification posted", e)
       } catch (e: Exception) {
         // AC-NT-15: no event.title in the log message.
         Log.e(TAG, "Failed to post notification for eventId=$eventIdValue", e)
