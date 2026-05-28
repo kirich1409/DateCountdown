@@ -42,6 +42,13 @@ sealed interface AddEditState {
     val hasUnsavedChanges: Boolean = false,
     val isSaving: Boolean = false,
     val saveError: String? = null,
+    /**
+     * True while the "discard unsaved changes?" confirmation dialog should be shown (AC-AE-10).
+     * Set to true by [AddEditStore.Intent.RequestDismiss] when [hasUnsavedChanges] is true;
+     * cleared to false by [AddEditStore.Intent.DiscardAndDismiss] and
+     * [AddEditStore.Intent.CancelDiscardConfirmation].
+     */
+    val showDiscardConfirmation: Boolean = false,
   ) : AddEditState
 
   /**

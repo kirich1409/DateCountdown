@@ -240,10 +240,13 @@ class AddEditStoreTest {
     val store = createStore(eventId = null, repo = repo)
     // title is "" by default in create mode — SaveEventUseCase rejects it
 
-    store.accept(AddEditStore.Intent.Save)
+    store.labels.test {
+      store.accept(AddEditStore.Intent.Save)
+      // invalid title: no label should be emitted
+      expectNoEvents()
+    }
 
     val form = store.state as? AddEditState.Form
-    assertNull("Save should not emit Saved label on invalid title", null)
     assertTrue("isSaving should be false after failure", form?.isSaving == false)
     assertTrue("saveError should be set on failure", form?.saveError != null)
 
@@ -292,26 +295,28 @@ class AddEditStoreTest {
   }
 
   @Test
-  fun `RequestDismiss with unsaved changes — emits ConfirmDiscard`() = runTest {
+  fun `RequestDismiss with unsaved changes — sets showDiscardConfirmation in state`() = runTest {
     val store = createStore(eventId = null)
     store.accept(AddEditStore.Intent.UpdateTitle(title = "Typed something"))
 
-    store.labels.test {
-      store.accept(AddEditStore.Intent.RequestDismiss)
+    store.accept(AddEditStore.Intent.RequestDismiss)
 
-      val label = awaitItem()
-      assertEquals(AddEditStore.Label.ConfirmDiscard, label)
-
-      cancelAndIgnoreRemainingEvents()
-    }
+    val form = store.state as AddEditState.Form
+    assertTrue("showDiscardConfirmation should be true when there are unsaved changes", form.showDiscardConfirmation)
 
     store.dispose()
   }
 
   @Test
-  fun `DiscardAndDismiss — emits Dismissed regardless of changes`() = runTest {
+  fun `DiscardAndDismiss — clears showDiscardConfirmation and emits Dismissed`() = runTest {
     val store = createStore(eventId = null)
+    // Put store into showDiscardConfirmation=true state first.
     store.accept(AddEditStore.Intent.UpdateTitle(title = "Changes"))
+    store.accept(AddEditStore.Intent.RequestDismiss)
+    assertTrue(
+      "showDiscardConfirmation should be true before discard",
+      (store.state as AddEditState.Form).showDiscardConfirmation,
+    )
 
     store.labels.test {
       store.accept(AddEditStore.Intent.DiscardAndDismiss)
@@ -321,6 +326,35 @@ class AddEditStoreTest {
 
       cancelAndIgnoreRemainingEvents()
     }
+
+    assertFalse(
+      "showDiscardConfirmation should be false after DiscardAndDismiss",
+      (store.state as AddEditState.Form).showDiscardConfirmation,
+    )
+
+    store.dispose()
+  }
+
+  @Test
+  fun `CancelDiscardConfirmation — clears showDiscardConfirmation without navigating`() = runTest {
+    val store = createStore(eventId = null)
+    // Put store into showDiscardConfirmation=true state.
+    store.accept(AddEditStore.Intent.UpdateTitle(title = "Changes"))
+    store.accept(AddEditStore.Intent.RequestDismiss)
+    assertTrue(
+      "showDiscardConfirmation should be true before cancel",
+      (store.state as AddEditState.Form).showDiscardConfirmation,
+    )
+
+    store.labels.test {
+      store.accept(AddEditStore.Intent.CancelDiscardConfirmation)
+      // "Нет" tap — no navigation label should be emitted
+      expectNoEvents()
+    }
+
+    val form = store.state as AddEditState.Form
+    assertFalse("showDiscardConfirmation should be false after cancel", form.showDiscardConfirmation)
+    assertTrue("unsaved changes should still be true", form.hasUnsavedChanges)
 
     store.dispose()
   }

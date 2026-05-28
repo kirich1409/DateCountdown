@@ -56,18 +56,27 @@ interface AddEditComponent {
   /**
    * User tapped Back or the sheet's dismiss affordance.
    *
-   * If there are unsaved changes the Store emits [AddEditStore.Label.ConfirmDiscard] and the UI
-   * should show a confirmation dialog. If there are no changes (or the user confirmed) the Store
-   * emits [AddEditStore.Label.Dismissed], which translates to [Output.Dismissed].
+   * If there are no unsaved changes the Store emits [AddEditStore.Label.Dismissed], which
+   * translates to [Output.Dismissed]. If there are unsaved changes the Store sets
+   * [AddEditState.Form.showDiscardConfirmation] = true; the UI observes this via [state] and
+   * shows a confirmation dialog (AC-AE-10).
    */
   fun onDismissRequest()
 
   /**
    * User confirmed they want to discard changes and close the sheet (AC-AE-13).
    *
-   * Call this when the user taps "Discard" in the confirmation dialog.
+   * Call this when the user taps "Discard" / "Да" in the confirmation dialog. Clears
+   * [AddEditState.Form.showDiscardConfirmation] then emits [Output.Dismissed].
    */
   fun onDiscardConfirmed()
+
+  /**
+   * User tapped "Нет" (cancel) in the discard-confirmation dialog (AC-AE-10).
+   *
+   * Clears [AddEditState.Form.showDiscardConfirmation]; the sheet remains open.
+   */
+  fun onDismissConfirmCancel()
 
   /**
    * Navigation outputs from the edit sheet.
@@ -89,16 +98,12 @@ interface AddEditComponent {
  * The [AddEditStore] is retained across configuration changes via [instanceKeeper.getOrCreate]:
  * the Store is destroyed only when the slot entry is dismissed, not on rotation (AC-AE-14).
  *
- * Label subscription:
- *  [AddEditStore.Label.Saved]         → [output] with [AddEditComponent.Output.Saved]
- *  [AddEditStore.Label.Dismissed]     → [output] with [AddEditComponent.Output.Dismissed]
- *  [AddEditStore.Label.ConfirmDiscard] → no navigation; the Compose UI observes this label via
- *   its own [Store.labels] subscription added in the screen composable (out of scope for this
- *   component — the component only handles navigation-level labels).
+ * Label subscription (navigation-level labels only):
+ *  [AddEditStore.Label.Saved]     → [output] with [AddEditComponent.Output.Saved]
+ *  [AddEditStore.Label.Dismissed] → [output] with [AddEditComponent.Output.Dismissed]
  *
- * Note: [AddEditStore.Label.ConfirmDiscard] is intentionally NOT translated here. It is a
- * UI-level signal that the Compose screen must handle to show the dialog. The component's
- * [labels] observable exposes all labels; the screen subscribes separately.
+ * The discard-confirmation dialog is driven by [AddEditState.Form.showDiscardConfirmation] in
+ * [state] — the Compose UI reads state directly without a separate label subscription (AC-AE-10).
  */
 @Suppress("LongParameterList")
 class DefaultAddEditComponent(
@@ -136,16 +141,11 @@ class DefaultAddEditComponent(
 
   init {
     // Translate navigation-level labels to the output callback.
-    // ConfirmDiscard is skipped here — the Compose screen subscribes to store.labels() directly
-    // to show the dialog without routing through RootComponent.
     store.labels(
       observer { label ->
         when (label) {
           AddEditStore.Label.Saved -> output(AddEditComponent.Output.Saved)
           AddEditStore.Label.Dismissed -> output(AddEditComponent.Output.Dismissed)
-          AddEditStore.Label.ConfirmDiscard -> {
-            // no-op: handled by the Compose screen's own label subscription
-          }
         }
       },
     )
@@ -177,5 +177,9 @@ class DefaultAddEditComponent(
 
   override fun onDiscardConfirmed() {
     store.accept(AddEditStore.Intent.DiscardAndDismiss)
+  }
+
+  override fun onDismissConfirmCancel() {
+    store.accept(AddEditStore.Intent.CancelDiscardConfirmation)
   }
 }

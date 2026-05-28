@@ -62,7 +62,7 @@ internal interface AddEditStore : Store<AddEditStore.Intent, AddEditState, AddEd
     /**
      * User confirmed they want to discard changes and close the sheet (AC-AE-13).
      *
-     * Emits [Label.Dismissed] unconditionally; no repository call is made.
+     * Clears [AddEditState.Form.showDiscardConfirmation] then emits [Label.Dismissed].
      */
     data object DiscardAndDismiss : Intent
 
@@ -70,10 +70,18 @@ internal interface AddEditStore : Store<AddEditStore.Intent, AddEditState, AddEd
      * User pressed Back / tapped the dismiss affordance.
      *
      * If [AddEditState.Form.hasUnsavedChanges] == false → emits [Label.Dismissed] immediately.
-     * If [AddEditState.Form.hasUnsavedChanges] == true  → emits [Label.ConfirmDiscard] so the
-     * Compose UI can show a confirmation dialog before dismissing.
+     * If [AddEditState.Form.hasUnsavedChanges] == true  → sets
+     * [AddEditState.Form.showDiscardConfirmation] = true so the UI can show a confirmation
+     * dialog without a separate label subscription (AC-AE-10).
      */
     data object RequestDismiss : Intent
+
+    /**
+     * User tapped "Нет" (cancel) in the discard-confirmation dialog (AC-AE-10).
+     *
+     * Clears [AddEditState.Form.showDiscardConfirmation]; no navigation occurs.
+     */
+    data object CancelDiscardConfirmation : Intent
   }
 
   sealed interface Label {
@@ -82,12 +90,6 @@ internal interface AddEditStore : Store<AddEditStore.Intent, AddEditState, AddEd
 
     /** Sheet should be dismissed without saving. */
     data object Dismissed : Label
-
-    /**
-     * The user has unsaved changes and attempted to dismiss. The Compose UI should show a
-     * confirmation dialog; if confirmed, dispatch [Intent.DiscardAndDismiss].
-     */
-    data object ConfirmDiscard : Label
   }
 }
 
@@ -119,6 +121,12 @@ private sealed interface Message {
   data object SaveStarted : Message
   data object SaveSucceeded : Message
   data class SaveFailed(val message: String) : Message
+
+  /** Reveals the discard-confirmation dialog ([AddEditState.Form.showDiscardConfirmation] = true). */
+  data object ShowDiscardConfirmation : Message
+
+  /** Hides the discard-confirmation dialog ([AddEditState.Form.showDiscardConfirmation] = false). */
+  data object HideDiscardConfirmation : Message
 }
 
 // ── Default form values ─────────────────────────────────────────────────────────────────────────────
@@ -187,8 +195,12 @@ private class Executor(
       is AddEditStore.Intent.UpdateColor -> dispatch(Message.ColorUpdated(color = intent.color))
       is AddEditStore.Intent.UpdateIcon -> dispatch(Message.IconUpdated(icon = intent.icon))
       AddEditStore.Intent.Save -> save()
-      AddEditStore.Intent.DiscardAndDismiss -> publish(AddEditStore.Label.Dismissed)
+      AddEditStore.Intent.DiscardAndDismiss -> {
+        dispatch(Message.HideDiscardConfirmation)
+        publish(AddEditStore.Label.Dismissed)
+      }
       AddEditStore.Intent.RequestDismiss -> requestDismiss()
+      AddEditStore.Intent.CancelDiscardConfirmation -> dispatch(Message.HideDiscardConfirmation)
     }
   }
 
@@ -198,8 +210,6 @@ private class Executor(
   private fun bootstrap() {
     if (eventId == null) {
       // Create mode: populate with defaults immediately, no I/O needed.
-      // Default date is "now + 1 year" rounded to the start of that day, which gives the user
-      // a sensible non-past starting point without needing Clock.System to be injectable in tests.
       dispatch(
         Message.DefaultsLoaded(
           title = "",
@@ -259,7 +269,7 @@ private class Executor(
   private fun requestDismiss() {
     val currentState = state()
     if (currentState is AddEditState.Form && currentState.hasUnsavedChanges) {
-      publish(AddEditStore.Label.ConfirmDiscard)
+      dispatch(Message.ShowDiscardConfirmation)
     } else {
       publish(AddEditStore.Label.Dismissed)
     }
@@ -272,6 +282,29 @@ private object AddEditReducer : Reducer<AddEditState, Message> {
 
   override fun AddEditState.reduce(msg: Message): AddEditState =
     when (msg) {
+      is Message.EventLoaded,
+      is Message.EventNotFound,
+      is Message.LoadFailed,
+      is Message.DefaultsLoaded,
+      -> reduceBootstrap(msg)
+
+      is Message.TitleUpdated,
+      is Message.TargetDateTimeUpdated,
+      is Message.ColorUpdated,
+      is Message.IconUpdated,
+      -> reduceFieldUpdate(msg)
+
+      Message.SaveStarted,
+      Message.SaveSucceeded,
+      is Message.SaveFailed,
+      -> reduceSave(msg)
+
+      Message.ShowDiscardConfirmation -> asForm { copy(showDiscardConfirmation = true) }
+      Message.HideDiscardConfirmation -> asForm { copy(showDiscardConfirmation = false) }
+    }
+
+  private fun AddEditState.reduceBootstrap(msg: Message): AddEditState =
+    when (msg) {
       is Message.EventLoaded -> AddEditState.Form(
         title = msg.event.title,
         targetDateTime = msg.event.targetDateTime,
@@ -279,13 +312,10 @@ private object AddEditReducer : Reducer<AddEditState, Message> {
         icon = msg.event.icon,
         hasUnsavedChanges = false,
       )
-
       is Message.EventNotFound -> AddEditState.LoadError(message = "Event not found")
-
       is Message.LoadFailed -> AddEditState.LoadError(
         message = msg.cause.message ?: "Failed to load event",
       )
-
       is Message.DefaultsLoaded -> AddEditState.Form(
         title = msg.title,
         targetDateTime = msg.targetDateTime,
@@ -293,22 +323,26 @@ private object AddEditReducer : Reducer<AddEditState, Message> {
         icon = msg.icon,
         hasUnsavedChanges = false,
       )
+      else -> this
+    }
 
+  private fun AddEditState.reduceFieldUpdate(msg: Message): AddEditState =
+    when (msg) {
       is Message.TitleUpdated -> asForm { copy(title = msg.title, hasUnsavedChanges = true) }
-
       is Message.TargetDateTimeUpdated -> asForm {
         copy(targetDateTime = msg.dateTime, hasUnsavedChanges = true)
       }
-
       is Message.ColorUpdated -> asForm { copy(color = msg.color, hasUnsavedChanges = true) }
-
       is Message.IconUpdated -> asForm { copy(icon = msg.icon, hasUnsavedChanges = true) }
+      else -> this
+    }
 
+  private fun AddEditState.reduceSave(msg: Message): AddEditState =
+    when (msg) {
       Message.SaveStarted -> asForm { copy(isSaving = true, saveError = null) }
-
       Message.SaveSucceeded -> asForm { copy(isSaving = false, saveError = null) }
-
       is Message.SaveFailed -> asForm { copy(isSaving = false, saveError = msg.message) }
+      else -> this
     }
 
   /**
