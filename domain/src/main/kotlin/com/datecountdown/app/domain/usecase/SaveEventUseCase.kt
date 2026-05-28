@@ -22,20 +22,26 @@ import kotlinx.datetime.Clock
  *   no longer exists at save time (e.g., deleted concurrently), [Clock.now] is used as a
  *   defensive fallback — callers should treat this as a new event in that edge case.
  *
- * ## Notification scheduling (AC-NT-4, AC-PE-13a)
- * After a successful persist:
- * - If [Event.targetDateTime] > [Clock.now] (upcoming) → [NotificationScheduler.schedule] is
- *   called to set (or replace) the exact alarm.
- * - Otherwise (past, or user shifted an upcoming event into the past on edit) →
- *   [NotificationScheduler.cancel] is called to remove any previously-scheduled alarm.
+ * ## Notification scheduling (AC-NT-4, AC-NT-13, AC-PE-13a)
+ * After a successful persist the scheduling decision depends on two conditions:
+ * - [scheduleNotification] = `true` **and** [Event.targetDateTime] > [Clock.now] (upcoming) →
+ *   [NotificationScheduler.schedule] is called to set (or replace) the exact alarm.
+ * - In all other cases → [NotificationScheduler.cancel] is called to remove any previously-
+ *   scheduled alarm. This covers: past target dates, user choosing «Save without notification»
+ *   after exact-alarm permission was denied (AC-NT-13), and events shifted into the past on edit.
  *   [NotificationScheduler.schedule] no-ops on past events but does NOT cancel a pre-existing
  *   alarm, which is why the cancel branch must be explicit.
  *
+ * ## scheduleNotification = false (AC-NT-13)
+ * Pass `false` when the user has explicitly chosen to save without a notification after
+ * [ExactAlarmPermissionChecker.canScheduleExactAlarms] returned `false`. The event is persisted
+ * normally; the alarm for this event id is cancelled (or stays absent).
+ *
  * ## SecurityException
  * On API 31–33 [NotificationScheduler.schedule] may throw [SecurityException] when
- * SCHEDULE_EXACT_ALARM has been denied (AC-NT-13). This use case lets it propagate; the
- * call site in the feature module is responsible for surfacing the permission-rationale dialog
- * described in AC-NT-13 (tracked in issue #48 — out of scope here).
+ * SCHEDULE_EXACT_ALARM has been denied. Callers must pre-check via [ExactAlarmPermissionChecker]
+ * and pass [scheduleNotification] = `false` when denied, so this exception is not expected in
+ * normal operation after the check (AC-NT-13).
  *
  * @param clock Overridable for deterministic testing; defaults to [Clock.System].
  */
@@ -53,12 +59,15 @@ class SaveEventUseCase(
   /**
    * Validates [draft], persists the resulting [Event], and schedules or cancels its alarm.
    *
+   * @param draft The event draft to validate and persist.
+   * @param scheduleNotification When `true` (default) an exact alarm is scheduled for upcoming
+   *   events. Pass `false` when the user explicitly chose to save without a notification after
+   *   [ExactAlarmPermissionChecker] returned `false` (AC-NT-13); the event is still persisted
+   *   and any prior alarm for this id is cancelled.
    * @return The persisted [Event] (includes the generated [EventId] for new events).
    * @throws IllegalArgumentException if the trimmed title is empty or longer than 60 characters.
-   * @throws SecurityException on API 31–33 when SCHEDULE_EXACT_ALARM is denied (propagated from
-   *   [NotificationScheduler.schedule]).
    */
-  suspend operator fun invoke(draft: EventDraft): Event {
+  suspend operator fun invoke(draft: EventDraft, scheduleNotification: Boolean = true): Event {
     val trimmedTitle = draft.title.trim()
     require(trimmedTitle.isNotEmpty() && trimmedTitle.length <= MAX_TITLE_LENGTH) { "title" }
 
@@ -93,10 +102,11 @@ class SaveEventUseCase(
       repo.update(event)
     }
 
-    // Schedule only upcoming events (AC-NT-4). For past targets — or when an edit shifts a
-    // previously-upcoming event into the past (AC-PE-13a) — cancel any lingering alarm explicitly.
-    // NotificationScheduler.schedule() no-ops on past events but does NOT remove an existing alarm.
-    if (event.targetDateTime > now) {
+    // Schedule only upcoming events when scheduling is requested (AC-NT-4, AC-NT-13).
+    // Cancel for past targets, user-opted-out saves, and events shifted into the past on edit
+    // (AC-PE-13a). NotificationScheduler.schedule() no-ops on past events but does NOT remove
+    // an existing alarm, so the cancel branch must be explicit in all non-schedule cases.
+    if (scheduleNotification && event.targetDateTime > now) {
       scheduler.schedule(event)
     } else {
       scheduler.cancel(event.id)

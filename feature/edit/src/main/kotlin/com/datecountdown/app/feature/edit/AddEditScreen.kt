@@ -2,6 +2,9 @@
 
 package com.datecountdown.app.feature.edit
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -51,6 +54,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -188,6 +192,23 @@ private fun AddEditFormContent(
     DiscardConfirmationDialog(
       onConfirm = component::onDiscardConfirmed,
       onDismiss = component::onDismissConfirmCancel,
+    )
+  }
+
+  if (state.exactAlarmDenied) {
+    val context = LocalContext.current
+    ExactAlarmDeniedDialog(
+      onOpenSettings = {
+        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+          data = Uri.fromParts("package", context.packageName, null)
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        // Rare OEM forks may not handle this action — skip silently if so.
+        runCatching { context.startActivity(intent) }
+        component.onExactAlarmDialogDismiss()
+      },
+      onSaveWithoutNotification = component::onSaveWithoutNotification,
+      onDismiss = component::onExactAlarmDialogDismiss,
     )
   }
 
@@ -748,6 +769,39 @@ private fun DiscardConfirmationDialog(
   )
 }
 
+/**
+ * Dialog shown when the user taps Save but exact-alarm permission has been denied (AC-NT-13).
+ *
+ * Provides two resolution paths:
+ *  - "Open settings" → launches ACTION_REQUEST_SCHEDULE_EXACT_ALARM, then dismisses the dialog
+ *    so the user can retry Save after granting permission.
+ *  - "Save without notification" → saves the event without scheduling an alarm.
+ *
+ * Dismissing the dialog (back or outside tap) clears the state without performing the save.
+ */
+@Composable
+private fun ExactAlarmDeniedDialog(
+  onOpenSettings: () -> Unit,
+  onSaveWithoutNotification: () -> Unit,
+  onDismiss: () -> Unit,
+) {
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text(text = stringResource(R.string.exact_alarm_denied_title)) },
+    text = { Text(text = stringResource(R.string.exact_alarm_denied_message)) },
+    confirmButton = {
+      TextButton(onClick = onOpenSettings) {
+        Text(text = stringResource(R.string.exact_alarm_denied_open_settings))
+      }
+    },
+    dismissButton = {
+      TextButton(onClick = onSaveWithoutNotification) {
+        Text(text = stringResource(R.string.exact_alarm_denied_save_without))
+      }
+    },
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Date/time formatting helpers
 // ---------------------------------------------------------------------------
@@ -887,4 +941,6 @@ private object PreviewAddEditComponent : AddEditComponent {
   override fun onDismissRequest() = Unit
   override fun onDiscardConfirmed() = Unit
   override fun onDismissConfirmCancel() = Unit
+  override fun onSaveWithoutNotification() = Unit
+  override fun onExactAlarmDialogDismiss() = Unit
 }

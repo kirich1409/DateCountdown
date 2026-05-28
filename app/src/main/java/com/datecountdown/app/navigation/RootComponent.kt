@@ -17,6 +17,7 @@ import com.arkivanov.decompose.value.subscribe
 import com.arkivanov.essenty.backhandler.BackCallback
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.datecountdown.app.domain.CountdownCalculator
+import com.datecountdown.app.domain.ExactAlarmPermissionChecker
 import com.datecountdown.app.domain.NotificationScheduler
 import com.datecountdown.app.domain.PastEventProcessor
 import com.datecountdown.app.domain.SettingsRepository
@@ -71,6 +72,7 @@ class RootComponent(
   private val pastProcessor: PastEventProcessor,
   private val notificationScheduler: NotificationScheduler,
   private val settings: SettingsRepository,
+  private val exactAlarmChecker: ExactAlarmPermissionChecker,
   private val clock: Clock = Clock.System,
 ) : ComponentContext by componentContext {
 
@@ -234,6 +236,7 @@ class RootComponent(
         storeFactory = storeFactory,
         getEvent = getEvent,
         saveEvent = saveEvent,
+        exactAlarmChecker = exactAlarmChecker,
         clock = clock,
         output = ::onEditOutput,
       ),

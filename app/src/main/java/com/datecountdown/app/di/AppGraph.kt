@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.datecountdown.app.data.EventsRepositoryImpl
+import com.datecountdown.app.data.ExactAlarmPermissionCheckerImpl
 import com.datecountdown.app.data.NotificationSchedulerImpl
 import com.datecountdown.app.data.SettingsRepositoryImpl
 import com.datecountdown.app.data.local.AppDatabase
@@ -15,6 +16,7 @@ import com.datecountdown.app.data.local.EventDao
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
 import com.datecountdown.app.domain.EventsRepository
+import com.datecountdown.app.domain.ExactAlarmPermissionChecker
 import com.datecountdown.app.domain.NotificationScheduler
 import com.datecountdown.app.domain.SettingsRepository
 import dev.zacsweers.metro.AppScope
@@ -54,6 +56,9 @@ interface AppGraph {
 
   /** Accessor exposed so feature components can obtain the MVIKotlin [StoreFactory]. */
   val storeFactory: StoreFactory
+
+  /** Accessor exposed so [com.datecountdown.app.navigation.RootComponent] can thread it to the edit component. */
+  val exactAlarmPermissionChecker: ExactAlarmPermissionChecker
 
   @DependencyGraph.Factory
   fun interface Factory {
@@ -109,4 +114,9 @@ interface AppGraph {
   @SingleIn(AppScope::class)
   @Provides
   fun provideStoreFactory(): StoreFactory = DefaultStoreFactory()
+
+  @SingleIn(AppScope::class)
+  @Provides
+  fun provideExactAlarmPermissionChecker(application: Application): ExactAlarmPermissionChecker =
+    ExactAlarmPermissionCheckerImpl(context = application)
 }
