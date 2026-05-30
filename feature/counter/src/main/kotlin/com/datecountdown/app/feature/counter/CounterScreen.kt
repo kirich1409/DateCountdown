@@ -735,13 +735,22 @@ private fun CounterDateChip(
 
 // ── Primary number display ────────────────────────────────────────────────────────────────────────
 
+// Floor/ceiling for primary-value autoSize. maxLines=1 + softWrap=false force single-line layout;
+// autoSize then shrinks the font until the text fits rather than wrapping to a second line.
+// 24sp floor: extends coverage to higher fontScale (1.5–2.0) and wider device widths,
+// preventing clipping of values like "245 дней". At fontScale 1.0, autoSize still chooses
+// the maximum font (up to 96sp), so readability is unaffected.
+private val primaryValueMinFontSize = 24.sp
+private val primaryValueMaxFontSize = 96.sp
+
 /**
  * Primary countdown number block.
  *
  * AC-CL-4: primary=YEARS shows years (large) + days (smaller) in a column.
  * AC-CL-5/6: all other primaries show one large number with pluralised label below.
- * AC-CL-15: BasicText + TextAutoSize.StepBased clamps the primary number between 48sp and 96sp
- *   so it never overflows at large fontScale values.
+ * AC-CL-15: BasicText + TextAutoSize.StepBased clamps the primary number between 32sp and 96sp.
+ *   maxLines=1 and softWrap=false prevent wrapping so autoSize is forced to shrink the font
+ *   rather than accepting a two-line layout.
  * AC-CL-19: the whole block is wrapped with [semantics(mergeDescendants=true)] and a
  * descriptive [contentDescription] so TalkBack reads "3 days until event", not digit-by-digit.
  */
@@ -772,14 +781,20 @@ private fun CounterPrimary(
             count = countdown.years,
             countdown.years,
           )
-          // AC-CL-15: autosize clamps displayLarge between 48sp..96sp.
+          // AC-CL-15: autosize clamps displayLarge between 32sp..96sp; maxLines=1 + softWrap=false
+          // prevent wrapping so autoSize shrinks font rather than accepting a 2-line layout.
           BasicText(
             text = yearsLabel,
             style = MaterialTheme.typography.displayLarge.copy(
               fontWeight = FontWeight.Bold,
               color = onHeroColor,
             ),
-            autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
+            maxLines = 1,
+            softWrap = false,
+            autoSize = TextAutoSize.StepBased(
+              minFontSize = primaryValueMinFontSize,
+              maxFontSize = primaryValueMaxFontSize,
+            ),
           )
           val daysLabel = pluralStringResource(
             id = CommonR.plurals.time_unit_day,
@@ -800,14 +815,19 @@ private fun CounterPrimary(
           count = countdown.days,
           countdown.days,
         )
-        // AC-CL-15: autosize clamps displayLarge between 48sp..96sp.
+        // AC-CL-15: see primaryValueMinFontSize / primaryValueMaxFontSize comment.
         BasicText(
           text = label,
           style = MaterialTheme.typography.displayLarge.copy(
             fontWeight = FontWeight.Bold,
             color = onHeroColor,
           ),
-          autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
+          maxLines = 1,
+          softWrap = false,
+          autoSize = TextAutoSize.StepBased(
+            minFontSize = primaryValueMinFontSize,
+            maxFontSize = primaryValueMaxFontSize,
+          ),
         )
       }
 
@@ -823,7 +843,12 @@ private fun CounterPrimary(
             fontWeight = FontWeight.Bold,
             color = onHeroColor,
           ),
-          autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
+          maxLines = 1,
+          softWrap = false,
+          autoSize = TextAutoSize.StepBased(
+            minFontSize = primaryValueMinFontSize,
+            maxFontSize = primaryValueMaxFontSize,
+          ),
         )
       }
 
@@ -839,7 +864,12 @@ private fun CounterPrimary(
             fontWeight = FontWeight.Bold,
             color = onHeroColor,
           ),
-          autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
+          maxLines = 1,
+          softWrap = false,
+          autoSize = TextAutoSize.StepBased(
+            minFontSize = primaryValueMinFontSize,
+            maxFontSize = primaryValueMaxFontSize,
+          ),
         )
       }
 
@@ -855,7 +885,12 @@ private fun CounterPrimary(
             fontWeight = FontWeight.Bold,
             color = onHeroColor,
           ),
-          autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
+          maxLines = 1,
+          softWrap = false,
+          autoSize = TextAutoSize.StepBased(
+            minFontSize = primaryValueMinFontSize,
+            maxFontSize = primaryValueMaxFontSize,
+          ),
         )
       }
     }
@@ -868,7 +903,8 @@ private fun CounterPrimary(
  * AC-PE-8: large −N (or "Сегодня" when DaysAgo == 0 is expressed as Today) with autosize,
  * secondary "N дней назад" label below for DaysAgo case.
  * AC-PE-11: Today → large "Сегодня" only; no secondary label.
- * AC-PE-16: BasicText + TextAutoSize.StepBased prevents overflow at max fontScale.
+ * AC-PE-16: BasicText + TextAutoSize.StepBased (32sp..96sp) with maxLines=1 + softWrap=false
+ *   prevents overflow and forces single-line layout at all fontScale values.
  * AC-PE-17: semantics mergeDescendants so TalkBack reads the whole block as one unit.
  */
 @Composable
@@ -894,7 +930,12 @@ private fun PastPrimary(
             fontWeight = FontWeight.Bold,
             color = onSurfaceColor,
           ),
-          autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
+          maxLines = 1,
+          softWrap = false,
+          autoSize = TextAutoSize.StepBased(
+            minFontSize = primaryValueMinFontSize,
+            maxFontSize = primaryValueMaxFontSize,
+          ),
         )
       }
 
@@ -910,7 +951,12 @@ private fun PastPrimary(
               fontWeight = FontWeight.Bold,
               color = onSurfaceColor,
             ),
-            autoSize = TextAutoSize.StepBased(minFontSize = 48.sp, maxFontSize = 96.sp),
+            maxLines = 1,
+            softWrap = false,
+            autoSize = TextAutoSize.StepBased(
+              minFontSize = primaryValueMinFontSize,
+              maxFontSize = primaryValueMaxFontSize,
+            ),
           )
           // AC-PE-8: secondary "N дней назад" label.
           val daysAgoLabel = pluralStringResource(
