@@ -772,7 +772,7 @@ private fun PastSectionHeader(
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Icon(
-      imageVector = Icons.Filled.MoreVert, // placeholder — replace with history icon
+      imageVector = HistoryIcon,
       contentDescription = stringResource(R.string.list_past_section_history_description),
       tint = MaterialTheme.colorScheme.onSurfaceVariant,
       modifier = Modifier.size(20.dp),
