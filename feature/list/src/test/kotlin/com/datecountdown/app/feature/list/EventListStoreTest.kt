@@ -17,7 +17,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -37,18 +36,16 @@ import org.junit.Test
  * Unit tests for [EventListStoreFactory] / [EventListStore].
  *
  * Uses [DefaultStoreFactory] (synchronous intent dispatch) with [StandardTestDispatcher] so that
- * delays in the Executor's scope (undo-window timer) are controlled by [advanceTimeBy].
+ * launched coroutines (scheduler calls, deleteEvent calls) are controlled by [advanceUntilIdle].
  *
- * Notes on timing:
+ * Notes on intent dispatch:
  * - [store.accept] is synchronous: state changes from [dispatch] are visible immediately on return.
  * - [advanceUntilIdle] is required after any [scope.launch] side effect (scheduler calls,
- *   deleteEvent calls committed from AC-LS-10a).
- * - Do NOT call [advanceUntilIdle] after [store.accept(DeleteEvent)] when checking pendingDelete
- *   still active; that would also advance virtual time past the 100 ms undo window and trigger
- *   [ClearPendingDelete].
+ *   deleteEvent calls committed from CommitDelete or AC-LS-10a).
  *
- * P0 coverage: delete label, undo window timing, sequential delete (AC-LS-10a).
- * P1 coverage: bootstrap, empty repo, mixed events, undo restore, toggle settings.
+ * P0 coverage: delete label, CommitDelete commit, undo, sequential delete (AC-LS-10a).
+ * P1 coverage: bootstrap, empty repo, mixed events, undo restore, idempotent CommitDelete,
+ *              toggle settings.
  */
 class EventListStoreTest {
 
@@ -62,8 +59,7 @@ class EventListStoreTest {
 
   @Before
   fun setUp() {
-    // CoroutineExecutor's scope defaults to Dispatchers.Main — point it at the test scheduler
-    // so delays (undo-window timer) are controlled by advanceTimeBy.
+    // CoroutineExecutor's scope defaults to Dispatchers.Main — point it at the test scheduler.
     Dispatchers.setMain(testDispatcher)
   }
 
@@ -78,21 +74,18 @@ class EventListStoreTest {
   private fun createStore(
     eventsFlow: MutableStateFlow<List<Event>> = MutableStateFlow(emptyList()),
     deleteRepo: FakeEventsRepository = FakeEventsRepository(),
-    deleteScheduler: FakeNotificationScheduler = FakeNotificationScheduler(),
     scheduler: FakeNotificationScheduler = FakeNotificationScheduler(),
     settings: FakeSettingsRepository = FakeSettingsRepository(),
     clock: Clock = fixedClock,
-    undoWindowMs: Long = 100L,
   ): EventListStore {
     val observeRepo = FakeEventsRepository(eventsFlow = eventsFlow)
     return EventListStoreFactory(
       storeFactory = DefaultStoreFactory(),
       getEvents = GetEventsUseCase(repo = observeRepo, clock = clock),
-      deleteEvent = DeleteEventUseCase(repo = deleteRepo, scheduler = deleteScheduler),
+      deleteEvent = DeleteEventUseCase(repo = deleteRepo, scheduler = FakeNotificationScheduler()),
       scheduler = scheduler,
       settings = settings,
       clock = clock,
-      undoWindowMs = undoWindowMs,
     ).create()
   }
 
@@ -184,58 +177,23 @@ class EventListStoreTest {
     }
 
   @Test
-  fun `DeleteEvent — sets pendingDelete immediately (synchronous dispatch)`() =
+  fun `DeleteEvent — sets pendingDelete immediately, repo delete NOT called`() =
     runTest(testDispatcher) {
+      val deleteRepo = FakeEventsRepository()
       val event = upcomingEvent(id = "e1", offsetSeconds = 86_400L)
-      val store = createStore(eventsFlow = MutableStateFlow(listOf(event)))
+      val store = createStore(
+        eventsFlow = MutableStateFlow(listOf(event)),
+        deleteRepo = deleteRepo,
+      )
       advanceUntilIdle()
 
-      // dispatch() is synchronous in DefaultStore/CoroutineExecutor; no advanceUntilIdle needed.
+      // dispatch(SetPendingDelete) is synchronous in DefaultStore/CoroutineExecutor.
       store.accept(EventListStore.Intent.DeleteEvent(id = event.id))
 
       val state = store.state as? EventListState.Content
       assertNotNull("pendingDelete should be set immediately after DeleteEvent", state?.pendingDelete)
       assertEquals(event, state?.pendingDelete?.event)
-
-      store.dispose()
-    }
-
-  @Test
-  fun `DeleteEvent — within undo window — repo delete is NOT yet called`() =
-    runTest(testDispatcher) {
-      val deleteRepo = FakeEventsRepository()
-      val event = upcomingEvent(id = "e1", offsetSeconds = 86_400L)
-      val store = createStore(
-        eventsFlow = MutableStateFlow(listOf(event)),
-        deleteRepo = deleteRepo,
-        undoWindowMs = 100L,
-      )
-      advanceUntilIdle()
-
-      store.accept(EventListStore.Intent.DeleteEvent(id = event.id))
-      // Do NOT advance time — the 100 ms undo window has not expired.
-
-      assertTrue("repo delete must not be called within the undo window", deleteRepo.deletedIds.isEmpty())
-
-      store.dispose()
-    }
-
-  @Test
-  fun `DeleteEvent — undo window expires — repo delete is called`() =
-    runTest(testDispatcher) {
-      val deleteRepo = FakeEventsRepository()
-      val event = upcomingEvent(id = "e1", offsetSeconds = 86_400L)
-      val store = createStore(
-        eventsFlow = MutableStateFlow(listOf(event)),
-        deleteRepo = deleteRepo,
-        undoWindowMs = 100L,
-      )
-      advanceUntilIdle()
-
-      store.accept(EventListStore.Intent.DeleteEvent(id = event.id))
-      advanceTimeBy(delayTimeMillis = 150L)
-
-      assertTrue("repo delete should be called after undo window expires", deleteRepo.deletedIds.contains(event.id))
+      assertTrue("repo delete must not be called before CommitDelete", deleteRepo.deletedIds.isEmpty())
 
       store.dispose()
     }
@@ -248,12 +206,11 @@ class EventListStoreTest {
       val store = createStore(
         eventsFlow = MutableStateFlow(listOf(event)),
         scheduler = scheduler,
-        undoWindowMs = 100L,
       )
       advanceUntilIdle()
 
       store.accept(EventListStore.Intent.DeleteEvent(id = event.id))
-      // scheduler.cancel is called inside scope.launch, so drain it.
+      // scheduler.cancel is called inside scope.launch; drain to pick it up.
       advanceUntilIdle()
 
       assertTrue("scheduler.cancel must be called", scheduler.cancelledIds.contains(event.id))
@@ -261,17 +218,100 @@ class EventListStoreTest {
       store.dispose()
     }
 
-  // ── Undo delete ───────────────────────────────────────────────────────────────────────────────────
+  // ── CommitDelete ──────────────────────────────────────────────────────────────────────────────────
 
   @Test
-  fun `UndoDelete — within window — clears pendingDelete (synchronous) and does not call repo delete`() =
+  fun `CommitDelete — commits pending, repo deleteEvent called, pendingDelete cleared`() =
     runTest(testDispatcher) {
       val deleteRepo = FakeEventsRepository()
       val event = upcomingEvent(id = "e1", offsetSeconds = 86_400L)
       val store = createStore(
         eventsFlow = MutableStateFlow(listOf(event)),
         deleteRepo = deleteRepo,
-        undoWindowMs = 100L,
+      )
+      advanceUntilIdle()
+
+      store.accept(EventListStore.Intent.DeleteEvent(id = event.id))
+      store.accept(EventListStore.Intent.CommitDelete(id = event.id))
+      // deleteEvent is called inside scope.launch; drain it.
+      advanceUntilIdle()
+
+      assertTrue("repo delete must be called after CommitDelete", deleteRepo.deletedIds.contains(event.id))
+      val state = store.state as? EventListState.Content
+      assertNull("pendingDelete should be null after CommitDelete", state?.pendingDelete)
+
+      store.dispose()
+    }
+
+  @Test
+  fun `CommitDelete with no pending — no-op (idempotent)`() =
+    runTest(testDispatcher) {
+      val deleteRepo = FakeEventsRepository()
+      val event = upcomingEvent(id = "e1", offsetSeconds = 86_400L)
+      val store = createStore(
+        eventsFlow = MutableStateFlow(listOf(event)),
+        deleteRepo = deleteRepo,
+      )
+      advanceUntilIdle()
+
+      // CommitDelete with no pending in flight — must not throw, must not call repo.
+      store.accept(EventListStore.Intent.CommitDelete(id = event.id))
+      advanceUntilIdle()
+
+      assertTrue("repo delete must not be called when there is no pending", deleteRepo.deletedIds.isEmpty())
+
+      store.dispose()
+    }
+
+  @Test
+  fun `CommitDelete with stale id — no-op, does not commit newer pending`() =
+    runTest(testDispatcher) {
+      val deleteRepo = FakeEventsRepository()
+      val eventA = upcomingEvent(id = "eA", offsetSeconds = 86_400L)
+      val eventB = upcomingEvent(id = "eB", offsetSeconds = 172_800L)
+      val eventsFlow = MutableStateFlow(listOf(eventA, eventB))
+      val store = createStore(
+        eventsFlow = eventsFlow,
+        deleteRepo = deleteRepo,
+      )
+      advanceUntilIdle()
+
+      // Delete A → pending = A.
+      store.accept(EventListStore.Intent.DeleteEvent(id = eventA.id))
+      // AC-LS-10a commits A; delete B → pending = B.
+      eventsFlow.value = listOf(eventB)
+      advanceUntilIdle()
+      store.accept(EventListStore.Intent.DeleteEvent(id = eventB.id))
+      advanceUntilIdle()  // drains the AC-LS-10a scope.launch for A
+
+      val deletedBeforeCommit = deleteRepo.deletedIds.toList()
+
+      // Stale A dismiss callback arrives — must not commit B.
+      store.accept(EventListStore.Intent.CommitDelete(id = eventA.id))
+      advanceUntilIdle()
+
+      assertEquals(
+        "stale CommitDelete(A) must not trigger additional deletes",
+        deletedBeforeCommit,
+        deleteRepo.deletedIds.toList(),
+      )
+      val state = store.state as? EventListState.Content
+      assertNotNull("B should still be pending after stale CommitDelete(A)", state?.pendingDelete)
+      assertEquals(eventB, state?.pendingDelete?.event)
+
+      store.dispose()
+    }
+
+  // ── Undo delete ───────────────────────────────────────────────────────────────────────────────────
+
+  @Test
+  fun `UndoDelete — clears pendingDelete and repo delete NOT called`() =
+    runTest(testDispatcher) {
+      val deleteRepo = FakeEventsRepository()
+      val event = upcomingEvent(id = "e1", offsetSeconds = 86_400L)
+      val store = createStore(
+        eventsFlow = MutableStateFlow(listOf(event)),
+        deleteRepo = deleteRepo,
       )
       advanceUntilIdle()
 
@@ -294,7 +334,6 @@ class EventListStoreTest {
       val store = createStore(
         eventsFlow = MutableStateFlow(listOf(event)),
         scheduler = scheduler,
-        undoWindowMs = 100L,
       )
       advanceUntilIdle()
 
@@ -318,7 +357,6 @@ class EventListStoreTest {
     val store = createStore(
       eventsFlow = MutableStateFlow(listOf(event)),
       scheduler = scheduler,
-      undoWindowMs = 100L,
     )
     advanceUntilIdle()
 
@@ -344,28 +382,64 @@ class EventListStoreTest {
       val store = createStore(
         eventsFlow = eventsFlow,
         deleteRepo = deleteRepo,
-        undoWindowMs = 100L,
       )
       advanceUntilIdle()
 
-      // Delete A — undo window opens; A should not be committed yet.
+      // Delete A — pending set; repo must not be called yet.
       store.accept(EventListStore.Intent.DeleteEvent(id = eventA.id))
-      assertTrue("A should not be deleted yet (undo window open)", deleteRepo.deletedIds.isEmpty())
+      assertTrue("A should not be deleted yet (pending, awaiting commit)", deleteRepo.deletedIds.isEmpty())
 
-      // Delete B before A's window expires — AC-LS-10a: A must be committed synchronously.
-      // Update the flow so B is now visible to the store state when softDelete(B) calls state().
+      // Delete B before CommitDelete(A) — AC-LS-10a: A must be committed synchronously.
+      // Update the flow so B is still visible when softDelete(B) calls state().
       eventsFlow.value = listOf(eventB)
       advanceUntilIdle()  // drain SetData so state sees the updated flow
       store.accept(EventListStore.Intent.DeleteEvent(id = eventB.id))
-      // The AC-LS-10a commit launches scope.launch { deleteEvent(A) }; drain it with a
-      // 1 ms step so that the immediately-queued coroutines (deleteEvent(A), scheduler.cancel(B))
-      // run, but B's 100 ms undo-window timer does NOT fire yet.
-      advanceTimeBy(delayTimeMillis = 1L)
+      // The AC-LS-10a commit launches scope.launch { deleteEvent(A) }; drain it.
+      advanceUntilIdle()
 
       assertTrue("A must be committed when B's delete is issued (AC-LS-10a)", deleteRepo.deletedIds.contains(eventA.id))
 
       val state = store.state as? EventListState.Content
       assertEquals(eventB, state?.pendingDelete?.event)
+
+      store.dispose()
+    }
+
+  @Test
+  fun `same-id DeleteEvent dispatched twice — does NOT commit, event still restorable`() =
+    runTest(testDispatcher) {
+      val deleteRepo = FakeEventsRepository()
+      val eventA = upcomingEvent(id = "eA", offsetSeconds = 86_400L)
+      val store = createStore(
+        eventsFlow = MutableStateFlow(listOf(eventA)),
+        deleteRepo = deleteRepo,
+      )
+      advanceUntilIdle()
+
+      // First delete — pending(A) set, no repo call.
+      store.accept(EventListStore.Intent.DeleteEvent(id = eventA.id))
+      assertTrue("A must not be deleted after first DeleteEvent", deleteRepo.deletedIds.isEmpty())
+
+      // Second delete with the SAME id — simulates confirmValueChange firing twice.
+      store.accept(EventListStore.Intent.DeleteEvent(id = eventA.id))
+      advanceUntilIdle()
+
+      // Bug: second DeleteEvent(A) commits A immediately → repo gets a delete call.
+      assertTrue(
+        "A must NOT be committed to repo on duplicate DeleteEvent (still undoable)",
+        deleteRepo.deletedIds.isEmpty(),
+      )
+
+      val state = store.state as? EventListState.Content
+      assertNotNull("pending must still reference A (event is restorable)", state?.pendingDelete)
+      assertEquals(eventA, state?.pendingDelete?.event)
+
+      // Undo must succeed: pending cleared, repo still empty.
+      store.accept(EventListStore.Intent.UndoDelete)
+      advanceUntilIdle()
+
+      assertNull("pending must be null after UndoDelete", (store.state as? EventListState.Content)?.pendingDelete)
+      assertTrue("repo delete must never be called after undo", deleteRepo.deletedIds.isEmpty())
 
       store.dispose()
     }

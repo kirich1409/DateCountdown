@@ -34,6 +34,8 @@
   <!-- Snackbar -->
   <string name="list_snackbar_deleted">Deleted</string>
   <string name="list_snackbar_undo">Undo</string>
+  <!-- Announced to screen readers after Undo restores an event (AC-LS-21) -->
+  <string name="list_snackbar_restored">Event restored</string>
 
   <!-- Global empty state -->
   <string name="list_empty_heading">Create your first event</string>

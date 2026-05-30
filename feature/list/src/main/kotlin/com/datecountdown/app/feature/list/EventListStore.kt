@@ -14,12 +14,9 @@ import com.datecountdown.app.domain.usecase.DeleteEventUseCase
 import com.datecountdown.app.domain.usecase.GetEventsUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * MVIKotlin Store for the event-list screen.
@@ -38,16 +35,29 @@ internal interface EventListStore : Store<EventListStore.Intent, EventListState,
      * Begin the soft-delete sequence for [id] (AC-LS-9, AC-LS-10).
      *
      * - Alarm is cancelled immediately via [NotificationScheduler].
-     * - A 5-second coroutine is launched; on expiry [DeleteEventUseCase] removes the event from
-     *   the repository.
+     * - The event is held as pending; the repository delete is NOT committed here — it is
+     *   committed when the UI snackbar dismisses via [CommitDelete].
      * - If a delete is already pending (AC-LS-10a), the previous one is committed synchronously
      *   before the new window opens.
      *
-     * Process-death gap: if the Executor's scope is cancelled while the timer is running, the
-     * alarm remains cancelled but the repository delete never executes — the event survives
-     * without an alarm until the next launch. Alarm restoration on restart is tracked in #45.
+     * Process-death gap: if the process dies while a delete is pending, the alarm was already
+     * cancelled but the repository delete never executes — the event survives without an alarm
+     * until the next launch. Alarm restoration on restart is tracked in #45.
      */
     data class DeleteEvent(val id: EventId) : Intent
+
+    /**
+     * Commit the pending delete to the repository (AC-LS-9).
+     *
+     * Called by the UI when the snackbar is dismissed without Undo (e.g. swipe-away or natural
+     * expiry of the `withTimeoutOrNull` window — 5 s for sighted users, extended under an active
+     * screen reader via `calculateRecommendedTimeoutMillis` — AC-ACC-6, AC-ACC-8).
+     *
+     * Idempotent: no-op when [id] does not match the current pending delete or there is no
+     * pending delete. The [id] guard prevents a stale dismiss callback for a superseded snackbar
+     * from committing a newer pending delete.
+     */
+    data class CommitDelete(val id: EventId) : Intent
 
     /**
      * Cancel the pending delete and restore the event (AC-LS-10).
@@ -93,7 +103,6 @@ private sealed interface Message {
 
 // ── Factory ────────────────────────────────────────────────────────────────────────────────────────
 
-@Suppress("LongParameterList")
 internal class EventListStoreFactory(
   private val storeFactory: StoreFactory,
   private val getEvents: GetEventsUseCase,
@@ -101,7 +110,6 @@ internal class EventListStoreFactory(
   private val scheduler: NotificationScheduler,
   private val settings: SettingsRepository,
   private val clock: Clock = Clock.System,
-  private val undoWindowMs: Long = 5_000L,
 ) {
 
   fun create(): EventListStore =
@@ -116,7 +124,6 @@ internal class EventListStoreFactory(
           scheduler = scheduler,
           settings = settings,
           clock = clock,
-          undoWindowMs = undoWindowMs,
         )
       },
       reducer = EventListReducer,
@@ -127,7 +134,7 @@ internal class EventListStoreFactory(
 
 /**
  * CoroutineExecutor subclass chosen over the DSL because:
- *  - the pending-delete [Job] must survive across multiple Intent dispatches (field on the Executor);
+ *  - the pending-delete record must survive across multiple Intent dispatches (field on the Executor);
  *  - [state()] is called synchronously inside intent handlers to look up the pending event.
  */
 private class Executor(
@@ -136,10 +143,9 @@ private class Executor(
   private val scheduler: NotificationScheduler,
   private val settings: SettingsRepository,
   private val clock: Clock,
-  private val undoWindowMs: Long,
 ) : CoroutineExecutor<EventListStore.Intent, Unit, EventListState, Message, EventListStore.Label>() {
 
-  /** Job + the Event being held in the undo window. Null when no delete is pending. */
+  /** The Event being held in the undo window. Null when no delete is pending. */
   private var pendingDeleteJob: PendingDeleteJob? = null
 
   override fun executeAction(action: Unit) {
@@ -150,6 +156,7 @@ private class Executor(
     when (intent) {
       EventListStore.Intent.LoadEvents -> observeEvents()
       is EventListStore.Intent.DeleteEvent -> softDelete(intent.id)
+      is EventListStore.Intent.CommitDelete -> commitDelete(intent.id)
       EventListStore.Intent.UndoDelete -> undoDelete()
       EventListStore.Intent.TogglePastSection -> togglePastSection()
       is EventListStore.Intent.UpdateThemeMode -> updateThemeMode(intent.mode)
@@ -188,16 +195,20 @@ private class Executor(
   }
 
   private fun softDelete(id: EventId) {
-    val currentState = state()
-    val content = currentState as? EventListState.Content ?: return
+    val content = state() as? EventListState.Content ?: return
 
-    val event = (content.upcoming + content.past).firstOrNull { it.id == id } ?: return
+    // Guard: confirmValueChange on SwipeToDismissBox may fire multiple times for the same swipe.
+    // A second DeleteEvent for the already-pending id is a no-op — the snackbar is already shown
+    // and the event is already restorable.
+    val event = (content.upcoming + content.past)
+      .firstOrNull { it.id == id }
+      .takeUnless { pendingDeleteJob?.event?.id == id }
+      ?: return
 
     // AC-LS-10a: if another delete is already pending, commit it immediately before opening the
     // new window.
     val existing = pendingDeleteJob
     if (existing != null) {
-      existing.job.cancel()
       val committedEvent = existing.event
       pendingDeleteJob = null
       scope.launch { deleteEvent(committedEvent.id) }
@@ -206,23 +217,32 @@ private class Executor(
     // Cancel the alarm immediately for instant UX feedback.
     scope.launch { scheduler.cancel(id) }
 
-    val expiresAt: Instant = clock.now().plus(undoWindowMs.milliseconds)
-    dispatch(Message.SetPendingDelete(PendingDelete(event = event, expiresAt = expiresAt)))
+    dispatch(Message.SetPendingDelete(PendingDelete(event = event)))
     publish(EventListStore.Label.ShowDeletedSnackbar(event = event))
 
-    val job = scope.launch {
-      delay(undoWindowMs)
-      deleteEvent(id)
-      pendingDeleteJob = null
-      dispatch(Message.ClearPendingDelete)
-    }
+    // No timer: the repository delete is committed via CommitDelete, dispatched by the UI when
+    // the snackbar is dismissed without Undo (Indefinite snackbar, dismissed after withTimeoutOrNull
+    // — 5 s baseline, extended under an active screen reader via calculateRecommendedTimeoutMillis).
+    pendingDeleteJob = PendingDeleteJob(event = event)
+  }
 
-    pendingDeleteJob = PendingDeleteJob(job = job, event = event)
+  /**
+   * Commit the repository delete for the pending event identified by [id].
+   *
+   * The [id] guard prevents a stale dismiss callback for a superseded snackbar from committing a
+   * newer pending delete (can happen when DeleteEvent(B) replaces DeleteEvent(A) and Compose
+   * delivers the A-snackbar's Dismissed callback late).
+   */
+  private fun commitDelete(id: EventId) {
+    val pending = pendingDeleteJob ?: return
+    if (pending.event.id != id) return
+    pendingDeleteJob = null
+    scope.launch { deleteEvent(id) }
+    dispatch(Message.ClearPendingDelete)
   }
 
   private fun undoDelete() {
     val pending = pendingDeleteJob ?: return
-    pending.job.cancel()
     pendingDeleteJob = null
     dispatch(Message.ClearPendingDelete)
 
@@ -288,6 +308,5 @@ private object EventListReducer : Reducer<EventListState, Message> {
 // ── Internal data holder ───────────────────────────────────────────────────────────────────────────
 
 private data class PendingDeleteJob(
-  val job: Job,
   val event: Event,
 )

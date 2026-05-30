@@ -36,6 +36,8 @@
   <!-- Snackbar -->
   <string name="list_snackbar_deleted">Удалено</string>
   <string name="list_snackbar_undo">Отменить</string>
+  <!-- Объявляется screen reader после восстановления события через «Отменить» (AC-LS-21) -->
+  <string name="list_snackbar_restored">Событие восстановлено</string>
 
   <!-- Global empty state -->
   <string name="list_empty_heading">Создайте первое событие</string>

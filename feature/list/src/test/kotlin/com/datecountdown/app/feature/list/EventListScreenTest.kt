@@ -171,6 +171,10 @@ private class FakeEventListComponent(
     deletedIds += id
   }
 
+  override fun onCommitDelete(id: EventId) {
+    // no-op: snackbar dismiss not exercised in screen tests
+  }
+
   override fun onUndoDelete() {
     undoDeleteCount++
   }

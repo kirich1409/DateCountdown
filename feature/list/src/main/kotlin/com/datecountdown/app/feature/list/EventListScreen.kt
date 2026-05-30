@@ -51,6 +51,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -63,6 +64,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalAccessibilityManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -133,6 +136,7 @@ fun EventListScreen(component: EventListComponent) {
     onAddClick = component::onAddClick,
     onDelete = component::onDelete,
     onUndoDelete = component::onUndoDelete,
+    onCommitDelete = component::onCommitDelete,
     onTogglePast = component::onTogglePast,
     onThemeModeChange = component::onThemeModeChange,
   )
@@ -148,14 +152,19 @@ fun EventListScreen(component: EventListComponent) {
  *
  * ## Snackbar lifecycle (AC-LS-9, AC-LS-10, AC-LS-21)
  * Driven exclusively by [EventListState.Content.pendingDelete]:
- * - null → A (new delete): launches a coroutine that shows an indefinite snackbar; [SnackbarResult]
- *   drives [onUndoDelete].
- * - A → B (AC-LS-10a replacement): key changes → previous coroutine cancelled (snackbar dismissed),
- *   new coroutine starts for the replacement event.
- * - A → null (timer expired or undo committed): key becomes null → coroutine cancelled, snackbar
- *   dismissed.
- * [SnackbarDuration.Indefinite] ensures the Store's 5-second timer is the single source of truth;
- * the UI never drives dismiss timing independently.
+ * - null → A (new delete): launches a coroutine that shows an [SnackbarDuration.Indefinite]
+ *   snackbar inside [withTimeoutOrNull]. Timeout is 5 s for sighted users; under an active screen
+ *   reader [AccessibilityManager.calculateRecommendedTimeoutMillis] extends it so Undo remains
+ *   reachable (AC-LS-21, AC-ACC-6/8).
+ * - ActionPerformed (Undo): [onUndoDelete] restores the event; a restore announcement is made
+ *   for screen readers.
+ * - null from [withTimeoutOrNull] (timeout expired) or Dismissed (swipe): [onCommitDelete]
+ *   commits the pending deletion.
+ * - A → B (AC-LS-10a replacement): key changes → previous coroutine cancelled; the previous
+ *   pending delete (A) was already committed synchronously by the Store via AC-LS-10a when B's
+ *   DeleteEvent arrived; on return to the screen the snackbar resumes from current pendingDelete.
+ * - A → null (undo committed from Store side): key becomes null → coroutine cancelled, snackbar
+ *   dismissed without triggering [onCommitDelete].
  */
 @Suppress("LongParameterList", "LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -166,6 +175,7 @@ internal fun EventListScreenContent(
   onAddClick: () -> Unit,
   onDelete: (id: EventId) -> Unit,
   onUndoDelete: () -> Unit,
+  onCommitDelete: (id: EventId) -> Unit,
   onTogglePast: () -> Unit,
   onThemeModeChange: (ThemeMode) -> Unit,
   modifier: Modifier = Modifier,
@@ -178,6 +188,7 @@ internal fun EventListScreenContent(
     state = state,
     snackbarHostState = snackbarHostState,
     onUndoDelete = onUndoDelete,
+    onCommitDelete = onCommitDelete,
   )
 
   val contentState = state as? EventListState.Content
@@ -247,30 +258,63 @@ internal fun EventListScreenContent(
   }
 }
 
-/** Drives the delete snackbar from [EventListState.Content.pendingDelete] (AC-LS-9/10/21). */
+/**
+ * Drives the delete snackbar from [EventListState.Content.pendingDelete] (AC-LS-9/10/21).
+ *
+ * ## Timeout mechanism
+ * Base window is 5 s for sighted users. Under an active screen reader (TalkBack / Switch Access)
+ * [AccessibilityManager.calculateRecommendedTimeoutMillis] returns an extended value — effectively
+ * until the user dismisses — so the Undo action remains reachable (AC-LS-21, AC-ACC-6/8).
+ *
+ * [SnackbarDuration.Indefinite] is used so the snackbar stays up until either:
+ *  - the user taps Undo (ActionPerformed) → [onUndoDelete]
+ *  - the user swipes it away (Dismissed) → [onCommitDelete]
+ *  - [withTimeoutOrNull] fires (returns null) → [onCommitDelete]
+ * On timeout the coroutine is cancelled; [SnackbarHostState.showSnackbar]'s `finally` block
+ * resets `currentSnackbarData` to null, dismissing the snackbar automatically.
+ */
 @Composable
 private fun ObservePendingDeleteSnackbar(
   state: EventListState,
   snackbarHostState: SnackbarHostState,
   onUndoDelete: () -> Unit,
+  onCommitDelete: (id: EventId) -> Unit,
 ) {
   val pendingDelete = (state as? EventListState.Content)?.pendingDelete
   val deletedLabel = stringResource(R.string.list_snackbar_deleted)
   val undoLabel = stringResource(R.string.list_snackbar_undo)
+  val restoredLabel = stringResource(R.string.list_snackbar_restored)
+  val a11yManager = LocalAccessibilityManager.current
+  val view = LocalView.current
 
   // LaunchedEffect key = event id:
-  //  - null→A: new effect, show snackbar indefinitely until Store timer or undo.
-  //  - A→B: effect restarts (AC-LS-10a), old coroutine cancelled (old snackbar dismissed).
+  //  - null→A: new effect, show snackbar with a11y-aware timeout.
+  //  - A→B: effect restarts (AC-LS-10a), old coroutine cancelled; the previous pending delete (A)
+  //    was already committed synchronously by the Store when B's DeleteEvent arrived.
   //  - A→null: effect restarts with null key → immediate return, snackbar dismissed.
   LaunchedEffect(pendingDelete?.event?.id) {
     val pending = pendingDelete ?: return@LaunchedEffect
-    val result = snackbarHostState.showSnackbar(
-      message = "${pending.event.title} — $deletedLabel",
-      actionLabel = undoLabel,
-      duration = SnackbarDuration.Indefinite,
-    )
-    if (result == SnackbarResult.ActionPerformed) {
-      onUndoDelete()
+    val timeoutMs = a11yManager?.calculateRecommendedTimeoutMillis(
+      originalTimeoutMillis = 5000L,
+      containsIcons = false,
+      containsText = true,
+      containsControls = true,
+    ) ?: 5000L
+    val result = withTimeoutOrNull(timeoutMs) {
+      snackbarHostState.showSnackbar(
+        message = "${pending.event.title} — $deletedLabel",
+        actionLabel = undoLabel,
+        duration = SnackbarDuration.Indefinite,
+      )
+    }
+    when (result) {
+      SnackbarResult.ActionPerformed -> {
+        onUndoDelete()
+        // Announce restore to screen-reader users; the snackbar liveRegion only announces
+        // deletion — the restore action has no visual feedback the SR would pick up.
+        view.announceForAccessibility(restoredLabel)
+      }
+      else -> onCommitDelete(pending.event.id) // null (timeout) or Dismissed (swipe) → commit
     }
   }
 }
@@ -1012,6 +1056,7 @@ private fun EventListLoadingPreview() {
       onAddClick = {},
       onDelete = {},
       onUndoDelete = {},
+      onCommitDelete = {},
       onTogglePast = {},
       onThemeModeChange = {},
     )
@@ -1034,6 +1079,7 @@ private fun EventListGlobalEmptyPreview() {
       onAddClick = {},
       onDelete = {},
       onUndoDelete = {},
+      onCommitDelete = {},
       onTogglePast = {},
       onThemeModeChange = {},
     )
@@ -1056,6 +1102,7 @@ private fun EventListUpcomingOnlyPreview() {
       onAddClick = {},
       onDelete = {},
       onUndoDelete = {},
+      onCommitDelete = {},
       onTogglePast = {},
       onThemeModeChange = {},
     )
@@ -1078,6 +1125,7 @@ private fun EventListWithCollapsedPastPreview() {
       onAddClick = {},
       onDelete = {},
       onUndoDelete = {},
+      onCommitDelete = {},
       onTogglePast = {},
       onThemeModeChange = {},
     )
@@ -1100,6 +1148,7 @@ private fun EventListWithExpandedPastPreview() {
       onAddClick = {},
       onDelete = {},
       onUndoDelete = {},
+      onCommitDelete = {},
       onTogglePast = {},
       onThemeModeChange = {},
     )
@@ -1122,6 +1171,7 @@ private fun EventListPartialEmptyPreview() {
       onAddClick = {},
       onDelete = {},
       onUndoDelete = {},
+      onCommitDelete = {},
       onTogglePast = {},
       onThemeModeChange = {},
     )
@@ -1139,6 +1189,7 @@ private fun EventListErrorPreview() {
       onAddClick = {},
       onDelete = {},
       onUndoDelete = {},
+      onCommitDelete = {},
       onTogglePast = {},
       onThemeModeChange = {},
     )
@@ -1215,6 +1266,7 @@ private fun EventListWithNotificationBannerPreview() {
         onAddClick = {},
         onDelete = {},
         onUndoDelete = {},
+        onCommitDelete = {},
         onTogglePast = {},
         onThemeModeChange = {},
       )
