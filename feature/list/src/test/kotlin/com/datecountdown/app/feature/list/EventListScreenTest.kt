@@ -2,6 +2,7 @@ package com.datecountdown.app.feature.list
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
@@ -73,6 +74,26 @@ internal class EventListScreenTest {
     }
 
     composeRule.onNodeWithText("Create your first event").assertIsDisplayed()
+  }
+
+  @Test
+  fun `global empty state - hourglass icon is present in blob`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(
+          component = FakeEventListComponent(
+            state = EventListState.Content(
+              upcoming = emptyList(),
+              past = emptyList(),
+              pastCollapsed = false,
+              pendingDelete = null,
+            ),
+          ),
+        )
+      }
+    }
+
+    composeRule.onNodeWithTag("empty_state_hourglass").assertExists()
   }
 
   // ── Interactions ───────────────────────────────────────────────────────────────────────────────

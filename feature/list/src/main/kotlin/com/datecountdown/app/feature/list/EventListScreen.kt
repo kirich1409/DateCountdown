@@ -82,6 +82,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -784,11 +785,7 @@ private fun PastSectionHeader(
 /**
  * Global empty state (AC-LS-14): no events at all — upcoming=0 AND past=0.
  *
- * Displays a teal blob, descriptive copy, and a primary "New event" button.
- *
- * Note: the spec calls for a `hourglass_empty` glyph inside the blob. That codepoint is not yet
- * included in the bundled Material Symbols Rounded subset. The blob is rendered as a plain solid
- * shape until the font subset is extended (tracked as a follow-up in issues #37/#38).
+ * Displays a teal blob with a hourglass icon, descriptive copy, and a primary "New event" button.
  * The blob uses [BlobShape.Variant1] (132dp, the large empty-state preset).
  */
 @Composable
@@ -805,15 +802,23 @@ private fun GlobalEmptyState(
       index = EventPaletteId.TEAL.ordinal,
       dark = isSystemInDarkTheme(),
     )
-    // Teal blob — hourglass_empty glyph is absent from the current EventIcon subset.
-    // Substitute EventSymbol(HOURGLASS_EMPTY, ...) once the font subset is extended (#37/#38).
     Box(
+      contentAlignment = Alignment.Center,
       modifier = Modifier
         .size(132.dp)
         .clip(BlobShape.Variant1)
         .background(tealPalette.container)
         .semantics { contentDescription = "" }, // decorative; heading below is the a11y label
-    )
+    ) {
+      Icon(
+        imageVector = HourglassIcon,
+        contentDescription = null, // decorative — heading below is the a11y label
+        tint = tealPalette.onContainer,
+        modifier = Modifier
+          .size(56.dp)
+          .testTag("empty_state_hourglass"),
+      )
+    }
 
     Spacer(modifier = Modifier.height(32.dp))
 
