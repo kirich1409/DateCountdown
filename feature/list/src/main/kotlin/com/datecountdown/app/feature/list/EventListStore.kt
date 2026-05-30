@@ -195,10 +195,15 @@ private class Executor(
   }
 
   private fun softDelete(id: EventId) {
-    val currentState = state()
-    val content = currentState as? EventListState.Content ?: return
+    val content = state() as? EventListState.Content ?: return
 
-    val event = (content.upcoming + content.past).firstOrNull { it.id == id } ?: return
+    // Guard: confirmValueChange on SwipeToDismissBox may fire multiple times for the same swipe.
+    // A second DeleteEvent for the already-pending id is a no-op — the snackbar is already shown
+    // and the event is already restorable.
+    val event = (content.upcoming + content.past)
+      .firstOrNull { it.id == id }
+      .takeUnless { pendingDeleteJob?.event?.id == id }
+      ?: return
 
     // AC-LS-10a: if another delete is already pending, commit it immediately before opening the
     // new window.

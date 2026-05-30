@@ -405,6 +405,45 @@ class EventListStoreTest {
       store.dispose()
     }
 
+  @Test
+  fun `same-id DeleteEvent dispatched twice — does NOT commit, event still restorable`() =
+    runTest(testDispatcher) {
+      val deleteRepo = FakeEventsRepository()
+      val eventA = upcomingEvent(id = "eA", offsetSeconds = 86_400L)
+      val store = createStore(
+        eventsFlow = MutableStateFlow(listOf(eventA)),
+        deleteRepo = deleteRepo,
+      )
+      advanceUntilIdle()
+
+      // First delete — pending(A) set, no repo call.
+      store.accept(EventListStore.Intent.DeleteEvent(id = eventA.id))
+      assertTrue("A must not be deleted after first DeleteEvent", deleteRepo.deletedIds.isEmpty())
+
+      // Second delete with the SAME id — simulates confirmValueChange firing twice.
+      store.accept(EventListStore.Intent.DeleteEvent(id = eventA.id))
+      advanceUntilIdle()
+
+      // Bug: second DeleteEvent(A) commits A immediately → repo gets a delete call.
+      assertTrue(
+        "A must NOT be committed to repo on duplicate DeleteEvent (still undoable)",
+        deleteRepo.deletedIds.isEmpty(),
+      )
+
+      val state = store.state as? EventListState.Content
+      assertNotNull("pending must still reference A (event is restorable)", state?.pendingDelete)
+      assertEquals(eventA, state?.pendingDelete?.event)
+
+      // Undo must succeed: pending cleared, repo still empty.
+      store.accept(EventListStore.Intent.UndoDelete)
+      advanceUntilIdle()
+
+      assertNull("pending must be null after UndoDelete", (store.state as? EventListState.Content)?.pendingDelete)
+      assertTrue("repo delete must never be called after undo", deleteRepo.deletedIds.isEmpty())
+
+      store.dispose()
+    }
+
   // ── Settings intents ──────────────────────────────────────────────────────────────────────────────
 
   @Test
