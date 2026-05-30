@@ -784,22 +784,22 @@ private fun PastSectionHeader(
       color = MaterialTheme.colorScheme.onSurface,
       modifier = Modifier.weight(weight = 1f),
     )
-    IconButton(
+    val label = if (collapsed) {
+      stringResource(R.string.list_past_expand)
+    } else {
+      stringResource(R.string.list_past_collapse)
+    }
+    TextButton(
       onClick = onToggle,
       modifier = Modifier.semantics {
         contentDescription = toggleDescription
         role = Role.Button
       },
     ) {
-      val label = if (collapsed) {
-        stringResource(R.string.list_past_expand)
-      } else {
-        stringResource(R.string.list_past_collapse)
-      }
       Text(
         text = if (collapsed) "↓ $label" else "↑ $label",
         style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
+        maxLines = 1,
       )
     }
   }
