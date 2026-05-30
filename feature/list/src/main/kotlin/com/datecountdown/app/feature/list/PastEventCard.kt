@@ -63,18 +63,15 @@ import kotlin.time.Duration.Companion.days
  * The card is a single merged semantics node: "{title}, {timeClause}".
  * [timeClause] is either "Сегодня"/"Today" or "N дней назад"/"N days ago".
  *
- * @param event       The past event to render.
- * @param now         The reference instant; computed once at the grid call site (AC-CL-12).
- * @param shapeVariant The [BlobShape] for the card outline (cycled by grid index).
- * @param onClick     Callback invoked when the user taps the card.
- * @param modifier    Modifier applied to the root [Surface].
+ * @param event    The past event to render.
+ * @param now      The reference instant; computed once at the grid call site (AC-CL-12).
+ * @param onClick  Callback invoked when the user taps the card.
+ * @param modifier Modifier applied to the root [Surface].
  */
-@Suppress("LongParameterList")
 @Composable
 internal fun PastEventCard(
   event: Event,
   now: Instant,
-  shapeVariant: BlobShape = BlobShape.Variant4,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -97,7 +94,7 @@ internal fun PastEventCard(
   val cardDescription = stringResource(R.string.past_card_a11y_description, event.title, timeClause)
 
   Surface(
-    shape = shapeVariant,
+    shape = EventCardShape,
     color = MaterialTheme.colorScheme.surfaceContainerHigh,
     contentColor = MaterialTheme.colorScheme.onSurface,
     modifier = modifier
@@ -259,7 +256,6 @@ private fun PastEventCardOneDayPreview() {
       PastEventCard(
         event = previewPastEvent(id = "1", title = "Trip to Japan", daysAgo = 1),
         now = previewNow,
-        shapeVariant = BlobShape.Variant1,
         onClick = {},
         modifier = Modifier.width(180.dp),
       )
@@ -276,7 +272,6 @@ private fun PastEventCardTwentyFiveDaysPreview() {
       PastEventCard(
         event = previewPastEvent(id = "2", title = "Wedding anniversary", daysAgo = 25),
         now = previewNow,
-        shapeVariant = BlobShape.Variant2,
         onClick = {},
         modifier = Modifier.width(180.dp),
       )
@@ -293,7 +288,6 @@ private fun PastEventCardFourHundredDaysPreview() {
       PastEventCard(
         event = previewPastEvent(id = "3", title = "Product launch event that was a long time ago", daysAgo = 400),
         now = previewNow,
-        shapeVariant = BlobShape.Variant3,
         onClick = {},
         modifier = Modifier.width(180.dp),
       )
@@ -311,7 +305,6 @@ private fun PastEventCardTodayPreview() {
       PastEventCard(
         event = previewPastEvent(id = "4", title = "Morning run", daysAgo = 0),
         now = previewNow,
-        shapeVariant = BlobShape.Variant4,
         onClick = {},
         modifier = Modifier.width(180.dp),
       )
