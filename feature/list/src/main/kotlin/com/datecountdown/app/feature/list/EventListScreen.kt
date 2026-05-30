@@ -116,10 +116,9 @@ import kotlin.time.Duration.Companion.days
  * - [EventListScreenContent]: pure, previewed, receives a snapshot of [EventListState] plus
  *   plain callbacks; has no awareness of the component or Store.
  *
- * ## Card placeholder strategy
- * Card bodies are intentionally minimal — a [BlobShape.Variant4] background with the event title
- * only. Full card content (date chip, countdown number, days-remaining label, icon badge) is
- * implemented in issues #37 (upcoming) and #38 (past).
+ * ## Card design
+ * Event cards are flat rounded rectangles with [EventCardShape] (28dp corners), displaying the
+ * event icon, date chip, countdown/countup number, days-remaining label, and event title.
  *
  * ## Empty-state derivation (AC-LS-14 / AC-LS-15)
  * Both GlobalEmpty and PartialEmpty are derived from [EventListState.Content] by the UI:
@@ -583,7 +582,6 @@ private fun EventsGrid(
         SwipeToDismissEventCard(
           event = event,
           now = now,
-          shapeVariant = SHAPE_VARIANTS[index % SHAPE_VARIANTS.size],
           onCardClick = { onCardClick(event.id.value) },
           onDelete = { onDelete(event.id) },
         )
@@ -604,7 +602,6 @@ private fun EventsGrid(
           SwipeToDismissPastCard(
             event = event,
             now = now,
-            shapeVariant = SHAPE_VARIANTS[index % SHAPE_VARIANTS.size],
             onCardClick = { onCardClick(event.id.value) },
             onDelete = { onDelete(event.id) },
           )
@@ -623,15 +620,12 @@ private fun EventsGrid(
  * committed; below 50% the card snaps back.
  *
  * @param now Reference instant passed through to [EventCard] for countdown calculation (AC-CL-12).
- * @param shapeVariant The [BlobShape] for the card outline, cycled by grid index.
  */
-@Suppress("LongParameterList")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToDismissEventCard(
   event: Event,
   now: Instant,
-  shapeVariant: BlobShape,
   onCardClick: () -> Unit,
   onDelete: () -> Unit,
   modifier: Modifier = Modifier,
@@ -655,23 +649,20 @@ private fun SwipeToDismissEventCard(
     enableDismissFromEndToStart = true,
     backgroundContent = { SwipeDeleteBackground() },
   ) {
-    EventCard(event = event, now = now, shapeVariant = shapeVariant, onClick = onCardClick)
+    EventCard(event = event, now = now, onClick = onCardClick)
   }
 }
 
 /**
  * Wraps a [PastEventCard] in a [SwipeToDismissBox] (end-to-start only, ≥50% threshold).
  *
- * @param now          Reference instant passed through to [PastEventCard] (AC-CL-12).
- * @param shapeVariant The [BlobShape] for the card outline, cycled by grid index.
+ * @param now Reference instant passed through to [PastEventCard] (AC-CL-12).
  */
-@Suppress("LongParameterList")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToDismissPastCard(
   event: Event,
   now: Instant,
-  shapeVariant: BlobShape,
   onCardClick: () -> Unit,
   onDelete: () -> Unit,
   modifier: Modifier = Modifier,
@@ -695,7 +686,7 @@ private fun SwipeToDismissPastCard(
     enableDismissFromEndToStart = true,
     backgroundContent = { SwipeDeleteBackground() },
   ) {
-    PastEventCard(event = event, now = now, shapeVariant = shapeVariant, onClick = onCardClick)
+    PastEventCard(event = event, now = now, onClick = onCardClick)
   }
 }
 

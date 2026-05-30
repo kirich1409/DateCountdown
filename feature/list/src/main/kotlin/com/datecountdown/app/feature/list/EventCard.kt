@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -37,7 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.datecountdown.app.core.design.theme.BlobShape
+import com.datecountdown.app.core.design.theme.BlobShape // used by EventIconBlob
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
 import com.datecountdown.app.core.design.theme.EventIcon as DesignEventIcon
 import com.datecountdown.app.core.design.theme.EventPaletteId
@@ -59,13 +60,8 @@ import kotlinx.datetime.toJavaLocalDateTime
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 
-// File-level allocation — never inside a composable (prevents per-recomposition allocation).
-internal val SHAPE_VARIANTS: List<BlobShape> = listOf(
-  BlobShape.Variant1,
-  BlobShape.Variant2,
-  BlobShape.Variant3,
-  BlobShape.Variant4,
-)
+/** Rounded-rectangle shape for upcoming and past event cards (bug #141). */
+internal val EventCardShape = RoundedCornerShape(28.dp)
 
 private val dateFormatter = DateTimeFormatter.ofPattern("dd MMM", Locale.getDefault())
 
@@ -79,7 +75,7 @@ private fun formatEventDate(target: Instant): String =
  * Upcoming event card for the list screen (issue #37).
  *
  * Displays:
- * - Blob-shaped surface in the event's palette container color ([shapeVariant] determines shape).
+ * - Rounded-rectangle surface in the event's palette container color ([EventCardShape]).
  * - Top-right date chip showing the target date in "09 MAY" locale-aware format.
  * - Top-left icon blob (44dp, [BlobShape.Variant4] clip) with hero background.
  * - Large days-remaining number using the hero color.
@@ -96,12 +92,10 @@ private fun formatEventDate(target: Instant): String =
  *
  * @param event The upcoming event to render.
  * @param isDark Whether the device is in dark theme — determines palette selection.
- * @param shapeVariant The [BlobShape] to use for the card outline (cycled by grid index).
  * @param now The reference instant for countdown calculation; must be pre-computed at call site.
  * @param onClick Callback invoked when the user taps the card.
  * @param modifier Modifier applied to the root [Box].
  */
-@Suppress("LongParameterList")
 @Composable
 internal fun EventCard(
   event: Event,
@@ -109,7 +103,6 @@ internal fun EventCard(
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
   isDark: Boolean = isSystemInDarkTheme(),
-  shapeVariant: BlobShape = BlobShape.Variant4,
 ) {
   val palette = remember(event.color.ordinal, isDark) {
     eventPaletteByIndex(index = event.color.ordinal, dark = isDark)
@@ -130,7 +123,7 @@ internal fun EventCard(
     modifier = modifier
       .fillMaxWidth()
       .aspectRatio(ratio = 1f)
-      .clip(shapeVariant)
+      .clip(EventCardShape)
       .background(palette.container)
       .clickable(role = Role.Button, onClickLabel = event.title, onClick = onClick)
       .semantics(mergeDescendants = true) {
@@ -227,6 +220,7 @@ private fun EventDateChip(
     color = textColor,
     modifier = modifier,
     maxLines = 1,
+    overflow = TextOverflow.Ellipsis,
   )
 }
 
@@ -296,7 +290,6 @@ private fun EventCardNearPreview() {
         ),
         now = previewNowCard,
         isDark = isSystemInDarkTheme(),
-        shapeVariant = BlobShape.Variant1,
         onClick = {},
         modifier = Modifier.size(180.dp),
       )
@@ -320,7 +313,6 @@ private fun EventCardFarPreview() {
         ),
         now = previewNowCard,
         isDark = isSystemInDarkTheme(),
-        shapeVariant = BlobShape.Variant2,
         onClick = {},
         modifier = Modifier.size(180.dp),
       )
@@ -347,7 +339,6 @@ private fun EventCardTodayPreview() {
         ),
         now = todayNow,
         isDark = isSystemInDarkTheme(),
-        shapeVariant = BlobShape.Variant3,
         onClick = {},
         modifier = Modifier.size(180.dp),
       )
@@ -390,7 +381,6 @@ private fun EventCardAllPalettesPreview() {
             ),
             now = previewNowCard,
             isDark = isSystemInDarkTheme(),
-            shapeVariant = SHAPE_VARIANTS[index % SHAPE_VARIANTS.size],
             onClick = {},
           )
         }
