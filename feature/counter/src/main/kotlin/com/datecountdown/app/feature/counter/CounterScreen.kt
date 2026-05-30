@@ -446,7 +446,7 @@ private fun PastCounter(
               tint = MaterialTheme.colorScheme.onSurfaceVariant,
               contentDescription = stringResource(
                 R.string.counter_icon_description,
-                designIcon.symbolName,
+                stringResource(designIcon.labelRes),
               ),
             )
           }
@@ -657,7 +657,7 @@ private fun CounterHeader(
         icon = designIcon,
         size = 36.sp,
         tint = palette.onContainer,
-        contentDescription = stringResource(R.string.counter_icon_description, designIcon.symbolName),
+        contentDescription = stringResource(R.string.counter_icon_description, stringResource(designIcon.labelRes)),
       )
     }
 
