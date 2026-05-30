@@ -10,7 +10,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.arkivanov.decompose.defaultComponentContext
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
-import com.datecountdown.app.di.AppGraph
 import com.datecountdown.app.domain.CountdownCalculator
 import com.datecountdown.app.domain.EventId
 import com.datecountdown.app.domain.EventsRepository
@@ -23,15 +22,14 @@ import com.datecountdown.app.navigation.RootComponent
 import com.datecountdown.app.navigation.RootContent
 import com.datecountdown.app.notifications.AlarmReceiver
 import com.datecountdown.app.notifications.NotificationChannels
-import dev.zacsweers.metro.createGraphFactory
 import kotlinx.coroutines.launch
 
 /**
  * Composition root for the application.
  *
  * Pattern (per spike 1.0):
- *  1. Metro [AppGraph] is created once via [createGraphFactory] + [AppGraph.Factory.create];
- *     its lifetime spans the Activity.
+ *  1. Metro [AppGraph] is created once in [DateCountdownApp] and lives for the process lifetime.
+ *     [MainActivity] reads it via `(application as DateCountdownApp).graph`.
  *  2. [RootComponent] is created with [defaultComponentContext] — this binds Decompose's
  *     lifecycle/state-keeper/back-handler to the Activity (requires [ComponentActivity]).
  *  3. [setContent] delegates to [RootContent] which wires [RootComponent.stack] (List ↔ Counter)
@@ -55,9 +53,10 @@ class MainActivity : ComponentActivity() {
     // Idempotent — safe to call on every Activity creation.
     NotificationChannels.ensureChannel(applicationContext)
 
-    // Metro root graph — holds all app-scoped singletons (AppDatabase, EventDao, EventsRepository).
-    // Application is passed through AppGraph.Factory so Room.databaseBuilder has a Context.
-    val graph: AppGraph = createGraphFactory<AppGraph.Factory>().create(application)
+    // Metro root graph — singleton for the process lifetime; owned by DateCountdownApp.
+    // Reading it here (instead of creating a new instance) prevents duplicate DataStore / Room
+    // instances on config-changes such as system theme switches (bug #138).
+    val graph = (application as DateCountdownApp).graph
 
     eventsRepository = graph.eventsRepository
 
