@@ -2,6 +2,7 @@ package com.datecountdown.app.feature.counter
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
@@ -109,6 +110,26 @@ internal class CounterScreenTest {
     composeRule.onNodeWithText("Event not found").assertIsDisplayed()
   }
 
+  // ── Icon a11y ─────────────────────────────────────────────────────────────────────────────────
+
+  @Test
+  fun `icon contentDescription uses localized name, not snake_case symbolName`() {
+    // Uses MUSIC_NOTE whose symbolName is "music_note" — the underscore makes the
+    // regression immediately visible if the fix is reverted.
+    composeRule.setContent {
+      DateCountdownTheme {
+        CounterScreen(component = FakeCounterComponent(state = upcomingState(icon = EventIcon.MUSIC_NOTE)))
+      }
+    }
+
+    // The localized label resolves to "Music icon" (EN strings).
+    // useUnmergedTree = true because EventSymbol is inside a merged-semantics container.
+    composeRule.onNodeWithContentDescription("Music icon", useUnmergedTree = true).assertExists()
+    // Regression guard: snake_case must not reach TalkBack.
+    composeRule.onNodeWithContentDescription("music_note icon", useUnmergedTree = true)
+      .assertDoesNotExist()
+  }
+
   // ── Interactions ───────────────────────────────────────────────────────────────────────────────
 
   @Test
@@ -140,17 +161,18 @@ internal class CounterScreenTest {
 
   // ── Helpers ────────────────────────────────────────────────────────────────────────────────────
 
-  private fun upcomingState(): CounterState.Upcoming = CounterState.Upcoming(
-    event = testEvent(),
-    countdown = CountdownResult.Upcoming(
-      years = 0,
-      days = 30,
-      hours = 4,
-      minutes = 15,
-      seconds = 0,
-      primary = CountdownUnit.DAYS,
-    ),
-  )
+  private fun upcomingState(icon: EventIcon = EventIcon.CAKE): CounterState.Upcoming =
+    CounterState.Upcoming(
+      event = testEvent(icon = icon),
+      countdown = CountdownResult.Upcoming(
+        years = 0,
+        days = 30,
+        hours = 4,
+        minutes = 15,
+        seconds = 0,
+        primary = CountdownUnit.DAYS,
+      ),
+    )
 
   private fun pastState(): CounterState.Past = CounterState.Past(
     event = testEvent(),
@@ -158,12 +180,12 @@ internal class CounterScreenTest {
   )
 
   @Suppress("MagicNumber")
-  private fun testEvent(): Event = Event(
+  private fun testEvent(icon: EventIcon = EventIcon.CAKE): Event = Event(
     id = EventId("event-1"),
     title = "Birthday",
     targetDateTime = Instant.parse("2027-06-15T10:00:00Z"),
     color = EventColor.BLUE,
-    icon = EventIcon.CAKE,
+    icon = icon,
     createdAt = Instant.parse("2025-01-01T00:00:00Z"),
   )
 }

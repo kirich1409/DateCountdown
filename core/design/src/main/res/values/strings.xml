@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Localized labels for EventIcon entries — used as TalkBack contentDescriptions.
+       One string per icon, in enum-declaration order. -->
+  <string name="event_icon_label_celebration">Celebration</string>
+  <string name="event_icon_label_cake">Cake</string>
+  <string name="event_icon_label_beach_access">Beach</string>
+  <string name="event_icon_label_rocket_launch">Rocket</string>
+  <string name="event_icon_label_school">School</string>
+  <string name="event_icon_label_favorite">Heart</string>
+  <string name="event_icon_label_music_note">Music</string>
+  <string name="event_icon_label_directions_run">Running</string>
+  <string name="event_icon_label_flight">Flight</string>
+  <string name="event_icon_label_movie">Movie</string>
+  <string name="event_icon_label_book_2">Book</string>
+  <string name="event_icon_label_spa">Spa</string>
+  <string name="event_icon_label_restaurant">Restaurant</string>
+  <string name="event_icon_label_sports_esports">Games</string>
+  <string name="event_icon_label_redeem">Gift</string>
+  <string name="event_icon_label_snowing">Snow</string>
+</resources>

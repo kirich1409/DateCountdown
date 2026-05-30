@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
  * ```kotlin
  * EventSymbol(
  *   icon = event.icon,
- *   contentDescription = stringResource(R.string.icon_description, event.icon.symbolName),
+ *   contentDescription = stringResource(R.string.icon_description, stringResource(designIcon.labelRes)),
  * )
  * ```
  *
@@ -52,7 +52,7 @@ fun EventSymbol(
   modifier: Modifier = Modifier,
   size: TextUnit = 24.sp,
   tint: Color = Color.Unspecified,
-  contentDescription: String? = icon.symbolName,
+  contentDescription: String? = null,
 ) {
   val semanticsModifier = if (contentDescription != null) {
     modifier.semantics { this.contentDescription = contentDescription }
@@ -92,7 +92,7 @@ private fun EventSymbolAllIconsPreview() {
             icon = icon,
             size = 32.sp,
             tint = MaterialTheme.colorScheme.onSurface,
-            contentDescription = icon.symbolName,
+            contentDescription = null,
           )
         }
       }

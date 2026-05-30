@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Локализованные названия EventIcon — используются как contentDescription для TalkBack.
+       Именительный падеж, sentence case. -->
+  <string name="event_icon_label_celebration">Праздник</string>
+  <string name="event_icon_label_cake">Торт</string>
+  <string name="event_icon_label_beach_access">Пляж</string>
+  <string name="event_icon_label_rocket_launch">Ракета</string>
+  <string name="event_icon_label_school">Учёба</string>
+  <string name="event_icon_label_favorite">Сердце</string>
+  <string name="event_icon_label_music_note">Музыка</string>
+  <string name="event_icon_label_directions_run">Бег</string>
+  <string name="event_icon_label_flight">Перелёт</string>
+  <string name="event_icon_label_movie">Кино</string>
+  <string name="event_icon_label_book_2">Книга</string>
+  <string name="event_icon_label_spa">Спа</string>
+  <string name="event_icon_label_restaurant">Ресторан</string>
+  <string name="event_icon_label_sports_esports">Игры</string>
+  <string name="event_icon_label_redeem">Подарок</string>
+  <string name="event_icon_label_snowing">Снег</string>
+</resources>

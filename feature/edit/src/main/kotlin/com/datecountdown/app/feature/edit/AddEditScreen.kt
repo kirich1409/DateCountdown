@@ -714,7 +714,7 @@ private fun IconPickerCell(
   val designIcon = remember(domainIcon.ordinal) {
     DesignEventIcon.entries[domainIcon.ordinal]
   }
-  val a11yDesc = stringResource(R.string.add_edit_icon_a11y, designIcon.symbolName)
+  val a11yDesc = stringResource(R.string.add_edit_icon_a11y, stringResource(designIcon.labelRes))
 
   val cellShape = if (isSelected) RoundedCornerShape(12.dp) else CircleShape
   val cellColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
