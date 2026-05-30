@@ -1,7 +1,6 @@
 package com.datecountdown.app.notifications
 
 import android.annotation.SuppressLint
-import android.app.Application
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,12 +8,11 @@ import android.content.Intent
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.datecountdown.app.DateCountdownApp
 import com.datecountdown.app.MainActivity
 import com.datecountdown.app.R
 import com.datecountdown.app.data.NotificationSchedulerImpl
-import com.datecountdown.app.di.AppGraph
 import com.datecountdown.app.domain.EventId
-import dev.zacsweers.metro.createGraphFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,11 +37,8 @@ import kotlin.time.Duration.Companion.seconds
  * `finally` to prevent the receiver from holding the wake lock forever.
  *
  * ## DI (Metro)
- * Each alarm fire constructs a fresh [AppGraph] from the application context. This matches
- * the pattern used in [com.datecountdown.app.MainActivity]:
- * `createGraphFactory<AppGraph.Factory>().create(application)`.
- * A side effect is a second SQLite connection when the Activity is also alive — acceptable for MVP
- * given the low alarm frequency.
+ * Resolves dependencies from the process-singleton [DateCountdownApp.graph] so that a single
+ * [AppGraph] instance is shared across the process, preventing duplicate DataStore files.
  *
  * ## Privacy (AC-NT-14, AC-NT-15)
  * The notification is posted with [NotificationCompat.VISIBILITY_PRIVATE] and a generic
@@ -86,7 +81,7 @@ class AlarmReceiver : BroadcastReceiver() {
         // BootReceiver fires before MainActivity has ever run and the channel is not yet created.
         NotificationChannels.ensureChannel(appContext)
 
-        val graph = createGraphFactory<AppGraph.Factory>().create(appContext as Application)
+        val graph = (appContext as DateCountdownApp).graph
         val event = withTimeout(8.seconds) { graph.eventsRepository.getById(EventId(eventIdValue)) }
 
         if (event == null) {

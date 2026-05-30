@@ -28,8 +28,8 @@ import dev.zacsweers.metro.SingleIn
  * Root Metro dependency graph for the app scope.
  *
  * Scoped with [AppScope] so that [SingleIn]-annotated providers produce one instance per graph
- * lifetime. The graph is created once in [com.datecountdown.app.MainActivity] via
- * [dev.zacsweers.metro.createGraphFactory]; its lifetime therefore matches the Activity.
+ * lifetime. The graph is created once in [com.datecountdown.app.DateCountdownApp] via
+ * [dev.zacsweers.metro.createGraphFactory]; its lifetime matches the process.
  *
  * [AppDatabase] and [EventDao] are provided as singletons here — the database must not be
  * rebuilt per injection. [EventsRepository], [SettingsRepository], and [NotificationScheduler]

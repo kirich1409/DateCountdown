@@ -1,12 +1,10 @@
 package com.datecountdown.app.notifications
 
-import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.datecountdown.app.di.AppGraph
-import dev.zacsweers.metro.createGraphFactory
+import com.datecountdown.app.DateCountdownApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,8 +35,8 @@ import kotlin.time.Duration.Companion.seconds
  * QUICKBOOT_POWERON on some devices) is safe.
  *
  * ## DI (Metro)
- * Constructs a fresh [AppGraph] from the application context, matching the pattern in
- * [AlarmReceiver]. The graph is not held beyond the coroutine lifetime.
+ * Resolves dependencies from the process-singleton [DateCountdownApp.graph] so that a single
+ * [AppGraph] instance is shared across the process, preventing duplicate DataStore files.
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -64,7 +62,7 @@ class BootReceiver : BroadcastReceiver() {
         // this receiver fires before MainActivity has ever run and the channel is not yet created.
         NotificationChannels.ensureChannel(appContext)
 
-        val graph = createGraphFactory<AppGraph.Factory>().create(appContext as Application)
+        val graph = (appContext as DateCountdownApp).graph
 
         val events = withTimeout(BOOT_RESCHEDULE_TIMEOUT) {
           graph.eventsRepository.observeEvents().first()
