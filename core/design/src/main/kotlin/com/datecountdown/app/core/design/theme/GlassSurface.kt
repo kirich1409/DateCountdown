@@ -32,13 +32,13 @@ import androidx.compose.ui.graphics.Shape
 // ---------------------------------------------------------------------------
 
 /** Glass fill alpha on API 31+. Matches the JSX `rgba(255,255,255,0.16)`. */
-private const val GLASS_ALPHA_DEFAULT = 0.16f
+const val GLASS_ALPHA_DEFAULT = 0.16f
 
 /**
  * Slightly elevated alpha for API 29-30, where no blur is available.
  * Higher opacity compensates so the cell still reads as "glass" without blur.
  */
-private const val GLASS_ALPHA_LEGACY = 0.26f
+const val GLASS_ALPHA_LEGACY = 0.26f
 
 /** Default glass fill color (white at the above alpha). */
 private val GlassFillWhite = Color.White

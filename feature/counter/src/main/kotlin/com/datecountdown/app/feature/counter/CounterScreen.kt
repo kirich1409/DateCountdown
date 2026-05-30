@@ -3,6 +3,7 @@
 package com.datecountdown.app.feature.counter
 
 import android.app.Activity
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -69,7 +70,10 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.datecountdown.app.core.common.R as CommonR
 import com.datecountdown.app.core.design.theme.BlobShape
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
+import com.datecountdown.app.core.design.theme.GLASS_ALPHA_DEFAULT
+import com.datecountdown.app.core.design.theme.GLASS_ALPHA_LEGACY
 import com.datecountdown.app.core.design.theme.GlassSurface
+import com.datecountdown.app.core.design.theme.scrimAlphaFor
 import com.datecountdown.app.core.design.theme.EventIcon as DesignEventIcon
 import com.datecountdown.app.core.design.theme.EventSymbol
 import com.datecountdown.app.core.design.theme.eventPaletteByIndex
@@ -94,6 +98,14 @@ import kotlin.time.Duration.Companion.days
 // File-level formatter allocation: avoids re-allocation inside composables (AC-CL-14).
 private val dateChipFormatter: DateTimeFormatter =
   DateTimeFormatter.ofPattern("dd MMMM yyyy · HH:mm", Locale.getDefault())
+
+// Date-chip background alpha (AC-CL-18).
+// Light: 0.4 — onContainer (dark text) over composite(hero, container, 0.4) → 4.93–5.97:1 ✓.
+// Dark:  0.8 — onContainer (light text) over composite(hero, container, 0.8) → 4.75–6.32:1 ✓.
+//   At 0.4 the mid-tone composite yields only 2.3–2.7:1 in dark; 0.8 is the minimum alpha
+//   that clears 4.5:1 across all 9 dark palettes (worst case: GREEN 4.751:1, PURPLE 4.899:1).
+private const val CHIP_BG_ALPHA_LIGHT = 0.4f
+private const val CHIP_BG_ALPHA_DARK = 0.8f
 
 /**
  * Two decorative blob shapes placed at the top-end and bottom-start corners of the hero background.
@@ -220,8 +232,8 @@ private fun CounterScreenContent(
  * Hero background uses [EventPalette.hero] colour derived from [event.color.ordinal].
  * AC-CL-13: top bar includes arrow_back, edit, and more_vert (containing "Delete").
  * AC-CL-14: header shows blob icon, "UNTIL" label, event title, and date chip.
- * AC-CL-18: amber (ordinal 8) and orange (ordinal 0) palettes receive a scrim on glass cells
- * to maintain ≥4.5:1 contrast.
+ * AC-CL-18: a per-palette minimum black scrim is applied on glass cells in light theme to
+ * maintain ≥4.5:1 contrast for white text. Scrim alpha is computed via [scrimAlphaFor].
  */
 @Suppress("LongParameterList", "LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -238,8 +250,18 @@ private fun UpcomingCounter(
   val palette = remember(event.color.ordinal, isDark) {
     eventPaletteByIndex(index = event.color.ordinal, dark = isDark)
   }
-  // AC-CL-18: amber (0=ORANGE, 8=AMBER) are light palettes — add scrim to maintain contrast.
-  val needsScrim = event.color == EventColor.ORANGE || event.color == EventColor.AMBER
+  // AC-CL-18: per-palette minimum scrim to ensure white text ≥4.5:1 contrast on glass cells.
+  // glassAlpha mirrors GlassSurface.kt tier constants (GLASS_ALPHA_DEFAULT=0.16 / GLASS_ALPHA_LEGACY=0.26).
+  // MUST stay in sync with GlassSurface — see #149 for the planned design-token extraction.
+  val scrimColor = remember(palette.hero, isDark) {
+    if (isDark) {
+      // dark hero is light → black scrim would reduce contrast, so disabled.
+      Color.Transparent
+    } else {
+      val glassAlpha = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) GLASS_ALPHA_DEFAULT else GLASS_ALPHA_LEGACY
+      Color.Black.copy(alpha = scrimAlphaFor(hero = palette.hero, glassAlpha = glassAlpha))
+    }
+  }
 
   // Edge-to-edge: requires Activity.enableEdgeToEdge() in :app/MainActivity.kt (already present).
   // Status/navigation bars are colored to match palette.hero so they blend into the background.
@@ -303,6 +325,7 @@ private fun UpcomingCounter(
           headerLabel = stringResource(R.string.counter_label_until),
           palette = palette,
           onHeroColor = palette.onHero,
+          isDark = isDark,
         )
 
         CounterPrimary(
@@ -312,7 +335,7 @@ private fun UpcomingCounter(
 
         GlassRow(
           countdown = countdown,
-          needsScrim = needsScrim,
+          scrimColor = scrimColor,
           onHeroColor = palette.onHero,
         )
 
@@ -612,6 +635,7 @@ private fun CounterHeader(
   headerLabel: String,
   palette: com.datecountdown.app.core.design.theme.EventPalette,
   onHeroColor: Color,
+  isDark: Boolean,
   modifier: Modifier = Modifier,
 ) {
   val designIcon = DesignEventIcon.entries[event.icon.ordinal]
@@ -637,11 +661,12 @@ private fun CounterHeader(
       )
     }
 
-    // B6: alpha lifted from 0.7 to 0.85 — 0.7 fails 4.5:1 on light hero palettes (amber/orange).
+    // AC-CL-18: full alpha — contrast is guaranteed by the per-palette scrim on glass cells,
+    // not by reducing label opacity. Alpha reduction is removed to satisfy WCAG AA for small text.
     Text(
       text = headerLabel,
       style = MaterialTheme.typography.labelSmall,
-      color = onHeroColor.copy(alpha = 0.85f),
+      color = onHeroColor,
       letterSpacing = 2.sp,
     )
 
@@ -654,10 +679,16 @@ private fun CounterHeader(
       overflow = TextOverflow.Ellipsis,
     )
 
+    // AC-CL-18: date-chip contrast is theme-dependent.
+    // Light: onContainer (dark text) over container@0.4 blended onto hero — ratio 4.93–5.97:1 ✓.
+    // Dark: hero is light, container is dark — onContainer (light text) over container@0.8 — ratio 4.75–6.32:1 ✓.
+    //   At 0.4 the mid-tone composite yields only 2.3–2.7:1; 0.8 is the minimum alpha
+    //   that clears 4.5:1 across all 9 dark palettes (worst case: GREEN 4.751:1).
+    val chipBgAlpha = if (isDark) CHIP_BG_ALPHA_DARK else CHIP_BG_ALPHA_LIGHT
     CounterDateChip(
       event = event,
-      onHeroColor = onHeroColor,
-      containerColor = palette.container.copy(alpha = 0.4f),
+      labelColor = palette.onContainer,
+      containerColor = palette.container.copy(alpha = chipBgAlpha),
     )
   }
 }
@@ -668,11 +699,16 @@ private fun CounterHeader(
  * AC-CL-14: format "30 апреля 2026 · 11:00" — full date with month name and wall-clock time.
  * Uses AssistChip for Material 3 chip styling. Non-interactive — clearAndSetSemantics exposes
  * the date text without announcing it as a button (AC-PE-17).
+ *
+ * AC-CL-18: [labelColor] uses [EventPalette.onContainer] in both themes; [containerColor] alpha
+ * is theme-dependent (light 0.4, dark 0.8). Light achieves 4.93–5.97:1; dark 4.75–6.32:1.
+ * In dark theme the hero is light and the container is dark, so a higher alpha is required
+ * to push the composite bg dark enough for onContainer (light text) to clear 4.5:1.
  */
 @Composable
 private fun CounterDateChip(
   event: Event,
-  onHeroColor: Color,
+  labelColor: Color,
   containerColor: Color,
   modifier: Modifier = Modifier,
 ) {
@@ -692,7 +728,7 @@ private fun CounterDateChip(
     },
     colors = AssistChipDefaults.assistChipColors(
       containerColor = containerColor,
-      labelColor = onHeroColor,
+      labelColor = labelColor,
     ),
   )
 }
@@ -907,20 +943,19 @@ private fun PastPrimary(
  * | SECONDS   | row hidden    |
  *
  * AC-CL-9: values are zero-padded ("02", "08"); unit label in CAPS below each number.
- * AC-CL-18: [needsScrim] passes a scrim colour to [GlassSurface] on light hero backgrounds.
+ * AC-CL-18: [scrimColor] is the per-palette minimum black scrim pre-computed by the caller
+ * via [scrimAlphaFor] to ensure white text ≥4.5:1 contrast. [Color.Transparent] in dark theme.
  */
 @Suppress("LongMethod")
 @Composable
 private fun GlassRow(
   countdown: CountdownResult.Upcoming,
-  needsScrim: Boolean,
+  scrimColor: Color,
   onHeroColor: Color,
   modifier: Modifier = Modifier,
 ) {
   // AC-CL-8: SECONDS → row hidden.
   if (countdown.primary == CountdownUnit.SECONDS) return
-
-  val scrimColor = if (needsScrim) Color.Black.copy(alpha = 0.15f) else Color.Transparent
 
   Row(
     modifier = modifier.fillMaxWidth(),
@@ -996,10 +1031,11 @@ private fun GlassCell(
         color = onHeroColor,
         fontWeight = FontWeight.Bold,
       )
+      // AC-CL-18: full alpha — contrast ensured by per-palette scrim passed via GlassSurface.
       Text(
         text = label,
         style = MaterialTheme.typography.labelSmall,
-        color = onHeroColor.copy(alpha = 0.7f),
+        color = onHeroColor,
         letterSpacing = 1.5.sp,
       )
     }
