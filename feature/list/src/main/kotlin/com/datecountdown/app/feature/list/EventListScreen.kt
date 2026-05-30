@@ -4,8 +4,10 @@ package com.datecountdown.app.feature.list
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -40,6 +42,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -457,7 +460,7 @@ private fun ListTopBar(
 @Composable
 private fun FilterChipsRow(modifier: Modifier = Modifier) {
   Row(
-    modifier = modifier.fillMaxWidth(),
+    modifier = modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
     horizontalArrangement = Arrangement.spacedBy(8.dp),
   ) {
     // "All" — always selected. The check-mark is rendered by FilterChip (visual only in MVP).
@@ -470,16 +473,38 @@ private fun FilterChipsRow(modifier: Modifier = Modifier) {
       selected = false,
       onClick = { /* no-op: filtering is post-MVP */ },
       label = { Text(stringResource(R.string.list_filter_soon)) },
+      leadingIcon = {
+        Icon(
+          imageVector = ScheduleIcon,
+          // Decorative — the chip label carries the accessible meaning.
+          contentDescription = null,
+          modifier = Modifier.size(FilterChipDefaults.IconSize),
+        )
+      },
     )
     FilterChip(
       selected = false,
       onClick = { /* no-op: filtering is post-MVP */ },
       label = { Text(stringResource(R.string.list_filter_this_month)) },
+      leadingIcon = {
+        Icon(
+          imageVector = CalendarMonthIcon,
+          contentDescription = null,
+          modifier = Modifier.size(FilterChipDefaults.IconSize),
+        )
+      },
     )
     FilterChip(
       selected = false,
       onClick = { /* no-op: filtering is post-MVP */ },
       label = { Text(stringResource(R.string.list_filter_past)) },
+      leadingIcon = {
+        Icon(
+          imageVector = HistoryIcon,
+          contentDescription = null,
+          modifier = Modifier.size(FilterChipDefaults.IconSize),
+        )
+      },
     )
   }
 }
