@@ -29,8 +29,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -345,7 +347,7 @@ private fun ListTopBar(
         enabled = false,
       ) {
         Icon(
-          imageVector = Icons.Filled.MoreVert, // placeholder — swap with menu/hamburger icon
+          imageVector = Icons.Filled.Menu,
           contentDescription = stringResource(R.string.list_menu_description),
         )
       }
@@ -357,7 +359,7 @@ private fun ListTopBar(
         enabled = false,
       ) {
         Icon(
-          imageVector = Icons.Filled.MoreVert, // placeholder — swap with search icon
+          imageVector = Icons.Filled.Search,
           contentDescription = stringResource(R.string.list_search_description),
         )
       }
