@@ -12,23 +12,22 @@ import com.datecountdown.app.domain.SettingsRepository
 import com.datecountdown.app.domain.ThemeMode
 import com.datecountdown.app.domain.usecase.DeleteEventUseCase
 import com.datecountdown.app.domain.usecase.GetEventsUseCase
-import kotlinx.datetime.Instant
 
 // ── Public state contract ──────────────────────────────────────────────────────────────────────────
 
 /**
- * Pending soft-delete record held in memory during the 5-second undo window (AC-LS-9, AC-LS-10).
+ * Pending soft-delete record held in memory until the UI snackbar is dismissed (AC-LS-9, AC-LS-10).
  *
- * [expiresAt] is used by the UI to drive the snackbar countdown (AC-LS-21).
+ * The alarm is cancelled immediately at [EventListStore.Intent.DeleteEvent] time; the repository
+ * delete is committed only when the snackbar is dismissed without Undo via
+ * [EventListStore.Intent.CommitDelete].
  *
  * Note: if the process dies or the back-stack entry is popped while this is non-null, the alarm
- * was already cancelled (at Intent.DeleteEvent time) but the repository delete was never executed
- * — the event therefore survives without an alarm until the next app launch.
- * Alarm restoration on restart is owned by issue #45.
+ * was already cancelled but the repository delete was never executed — the event therefore survives
+ * without an alarm until the next app launch. Alarm restoration on restart is owned by issue #45.
  */
 data class PendingDelete(
   val event: Event,
-  val expiresAt: Instant,
 )
 
 /**
@@ -58,7 +57,10 @@ sealed interface EventListState {
     /** Whether the "Past" section header is collapsed (AC-LS-11). Persisted in SettingsRepository. */
     val pastCollapsed: Boolean,
     /**
-     * Non-null while a soft-delete is in its 5-second undo window (AC-LS-9, AC-LS-10).
+     * Non-null while a soft-delete is pending (AC-LS-9, AC-LS-10). The window lasts as long as the
+     * snackbar is visible ([SnackbarDuration.Indefinite] wrapped in `withTimeoutOrNull`; the
+     * timeout is 5 s for sighted users and is extended under an active screen reader via
+     * `calculateRecommendedTimeoutMillis` — AC-ACC-6, AC-ACC-8). Committed via [EventListStore.Intent.CommitDelete].
      * Only one pending delete is held at a time (AC-LS-10a).
      */
     val pendingDelete: PendingDelete?,
@@ -99,15 +101,24 @@ interface EventListComponent {
   /**
    * User dismissed a card via swipe / long-press delete (AC-LS-9).
    *
-   * Triggers the soft-delete sequence: alarm is cancelled immediately, a 5-second undo window
-   * opens, and the repository delete is committed on expiry.
+   * Triggers the soft-delete sequence: alarm is cancelled immediately, event is held as pending,
+   * and a snackbar is shown with an Undo affordance. The repository delete is committed when the
+   * snackbar is dismissed via [onCommitDelete].
    */
   fun onDelete(id: EventId)
 
   /**
+   * Snackbar was dismissed without Undo — commit the repository delete (AC-LS-9).
+   *
+   * [id] must match the currently pending event; stale callbacks for superseded snackbars are
+   * silently ignored. Call this from the snackbar's [SnackbarResult.Dismissed] branch.
+   */
+  fun onCommitDelete(id: EventId)
+
+  /**
    * User tapped "Undo" in the snackbar (AC-LS-10).
    *
-   * Cancels the pending delete timer and restores the alarm if the event is still upcoming.
+   * Cancels the pending delete and restores the alarm if the event is still upcoming.
    */
   fun onUndoDelete()
 
@@ -193,6 +204,10 @@ class DefaultEventListComponent(
 
   override fun onDelete(id: EventId) {
     store.accept(EventListStore.Intent.DeleteEvent(id = id))
+  }
+
+  override fun onCommitDelete(id: EventId) {
+    store.accept(EventListStore.Intent.CommitDelete(id = id))
   }
 
   override fun onUndoDelete() {
