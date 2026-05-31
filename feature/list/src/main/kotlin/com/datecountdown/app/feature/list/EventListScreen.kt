@@ -5,7 +5,7 @@ package com.datecountdown.app.feature.list
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.datecountdown.app.core.design.theme.LocalResolvedDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
@@ -825,7 +825,7 @@ private fun GlobalEmptyState(
   ) {
     val tealPalette = eventPaletteByIndex(
       index = EventPaletteId.TEAL.ordinal,
-      dark = isSystemInDarkTheme(),
+      dark = LocalResolvedDarkTheme.current,
     )
     Box(
       contentAlignment = Alignment.Center,
