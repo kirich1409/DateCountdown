@@ -100,6 +100,12 @@ import kotlin.time.Duration.Companion.days
 private val dateChipFormatter: DateTimeFormatter =
   DateTimeFormatter.ofPattern("dd MMMM yyyy · HH:mm", Locale.getDefault())
 
+// Accessibility-only formatter: same date/time without the middle-dot separator (U+00B7).
+// TTS engines may read "·" literally ("middle dot") breaking the spoken date — use comma+space
+// instead, which yields a natural pause: "10 June 2026, 14:34".
+private val dateChipA11yFormatter: DateTimeFormatter =
+  DateTimeFormatter.ofPattern("dd MMMM yyyy, HH:mm", Locale.getDefault())
+
 // Date-chip background alpha (AC-CL-18).
 // Light: 0.4 — onContainer (dark text) over composite(hero, container, 0.4) → 4.93–5.97:1 ✓.
 // Dark:  0.8 — onContainer (light text) over composite(hero, container, 0.8) → 4.75–6.32:1 ✓.
@@ -713,18 +719,19 @@ private fun CounterDateChip(
   containerColor: Color,
   modifier: Modifier = Modifier,
 ) {
-  val formattedDate = remember(event.targetDateTime) {
+  val localDateTime = remember(event.targetDateTime) {
     event.targetDateTime
       .toLocalDateTime(TimeZone.currentSystemDefault())
       .toJavaLocalDateTime()
-      .format(dateChipFormatter)
   }
+  val formattedDate = remember(localDateTime) { localDateTime.format(dateChipFormatter) }
+  val formattedDateA11y = remember(localDateTime) { localDateTime.format(dateChipA11yFormatter) }
 
   @Suppress("EmptyFunctionBlock")
   AssistChip(
     onClick = {},  // no-op: visual chip only — clearAndSetSemantics neutralises the click role
     label = { Text(text = formattedDate, style = MaterialTheme.typography.bodySmall) },
-    modifier = modifier.clearAndSetSemantics { contentDescription = formattedDate },
+    modifier = modifier.clearAndSetSemantics { contentDescription = formattedDateA11y },
     colors = AssistChipDefaults.assistChipColors(
       containerColor = containerColor,
       labelColor = labelColor,

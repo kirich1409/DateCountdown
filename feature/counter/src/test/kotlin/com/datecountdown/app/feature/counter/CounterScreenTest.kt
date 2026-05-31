@@ -154,6 +154,25 @@ internal class CounterScreenTest {
     dateChip.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
   }
 
+  @Test
+  fun `date chip - contentDescription does not contain middle dot`() {
+    // Regression guard for bug #167 WARN: dateChipFormatter uses U+00B7 (middle dot) as a visual
+    // separator. Some TTS engines may read it literally. The a11y contentDescription must use
+    // dateChipA11yFormatter (comma-separated) so TTS produces a natural spoken pause.
+    // testEvent.targetDateTime = 2027-06-15T10:00:00Z.
+    composeRule.setContent {
+      DateCountdownTheme {
+        CounterScreen(component = FakeCounterComponent(state = upcomingState()))
+      }
+    }
+
+    // "2027" is a locale-independent substring present in any locale's rendering of the date.
+    val dateChip = composeRule.onNodeWithContentDescription("2027", substring = true)
+    dateChip.assertExists()
+    // The middle-dot character (U+00B7) must NOT appear in the contentDescription.
+    composeRule.onNodeWithContentDescription("\u00B7", substring = true).assertDoesNotExist()
+  }
+
   // ── Interactions ───────────────────────────────────────────────────────────────────────────────
 
   @Test
