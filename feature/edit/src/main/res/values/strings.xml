@@ -3,6 +3,7 @@
   <string name="add_edit_title_create">New Event</string>
   <string name="add_edit_title_edit">Edit Event</string>
   <string name="add_edit_save">Save</string>
+  <string name="add_edit_saving_cd">Saving…</string>
   <string name="add_edit_close_cd">Close</string>
   <string name="add_edit_title_label">Title</string>
   <string name="add_edit_title_placeholder">What are we waiting for?</string>

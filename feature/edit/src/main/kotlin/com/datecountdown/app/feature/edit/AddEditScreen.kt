@@ -63,6 +63,7 @@ import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
@@ -413,10 +414,15 @@ private fun AddEditTopBar(
       }
     },
     actions = {
+      val savingCd = stringResource(R.string.add_edit_saving_cd)
       Button(
         onClick = onSave,
         enabled = saveEnabled,
-        modifier = Modifier.padding(end = 8.dp),
+        modifier = Modifier
+          .padding(end = 8.dp)
+          .then(
+            if (isSaving) Modifier.semantics { contentDescription = savingCd } else Modifier,
+          ),
       ) {
         if (isSaving) {
           CircularProgressIndicator(

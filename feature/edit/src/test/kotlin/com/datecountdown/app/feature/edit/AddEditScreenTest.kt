@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
@@ -176,6 +177,47 @@ internal class AddEditScreenTest {
 
     component.onIconChange(EventIcon.MUSIC_NOTE)
     assert(component.iconChanges == listOf(EventIcon.MUSIC_NOTE))
+  }
+
+  // ── contentDescription (BUG-001, a11y rule 1) ─────────────────────────────────────────────────
+
+  @Test
+  fun `close button has non-empty contentDescription`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        AddEditScreen(component = FakeAddEditComponent(formState(title = "Concert")))
+      }
+    }
+
+    // Close icon must be announced by TalkBack — contentDescription = "Close" (EN locale).
+    composeRule.onNodeWithContentDescription("Close").assertExists()
+  }
+
+  @Test
+  fun `save button has non-empty contentDescription when not saving`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        AddEditScreen(component = FakeAddEditComponent(formState(title = "Concert")))
+      }
+    }
+
+    // In normal state the Button's merged text "Save" serves as its accessible name.
+    composeRule.onNodeWithText("Save").assertExists()
+  }
+
+  @Test
+  fun `save button has contentDescription when isSaving is true`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        AddEditScreen(
+          component = FakeAddEditComponent(formState(title = "Concert", isSaving = true)),
+        )
+      }
+    }
+
+    // When the spinner replaces the Save text, the button must still have an accessible name.
+    // The semantics contentDescription "Saving…" is set explicitly via Modifier.semantics.
+    composeRule.onNodeWithContentDescription("Saving…").assertExists()
   }
 
   // ── Traversal order (AC-AE-16, a11y rule 7) ───────────────────────────────────────────────────

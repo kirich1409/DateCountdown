@@ -3,6 +3,7 @@
   <string name="add_edit_title_create">Новое событие</string>
   <string name="add_edit_title_edit">Редактировать событие</string>
   <string name="add_edit_save">Сохранить</string>
+  <string name="add_edit_saving_cd">Сохранение…</string>
   <string name="add_edit_close_cd">Закрыть</string>
   <string name="add_edit_title_label">Название</string>
   <string name="add_edit_title_placeholder">Что будем ждать?</string>
