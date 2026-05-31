@@ -114,10 +114,18 @@ internal fun EventCard(
     computeTotalDays(target = event.targetDateTime, now = now)
   }
   val dateLabel = remember(event.targetDateTime) { formatEventDate(event.targetDateTime) }
-  val daysLabel = pluralStringResource(R.plurals.days_left, count = totalDays, totalDays)
-  val cardDescription = stringResource(
-    R.string.list_card_a11y_description, event.title, totalDays, dateLabel,
-  )
+  // Same-day upcoming: show "Today"/"Сегодня" instead of "0 days left" (AC-LS-5 / bug #165).
+  val todayLabel = if (totalDays == 0) stringResource(R.string.card_today_label) else null
+  val daysLabel = if (todayLabel == null) {
+    pluralStringResource(R.plurals.days_left, count = totalDays, totalDays)
+  } else {
+    null
+  }
+  val cardDescription = if (todayLabel != null) {
+    stringResource(R.string.list_card_today_a11y_description, event.title)
+  } else {
+    stringResource(R.string.list_card_a11y_description, event.title, totalDays, dateLabel)
+  }
 
   Box(
     modifier = modifier
@@ -147,6 +155,7 @@ internal fun EventCard(
       EventIconBlob(icon = designIcon, heroColor = palette.hero, onHeroColor = palette.onHero)
       EventCardCountdown(
         totalDays = totalDays,
+        todayLabel = todayLabel,
         daysLabel = daysLabel,
         title = event.title,
         heroColor = palette.hero,
@@ -168,30 +177,44 @@ private fun computeTotalDays(target: Instant, now: Instant): Int {
   }
 }
 
-/** Bottom section of the card: large days number, plural label, and event title. */
+/**
+ * Bottom section of the card: large days number (or "Today" label), plural label, and event title.
+ *
+ * When [todayLabel] is non-null (same-day event, totalDays == 0):
+ * - The large slot shows [todayLabel] ("Today"/"Сегодня") instead of the number.
+ * - The secondary [daysLabel] row is hidden (mirrors [PastCountdown] Today-branch, AC-PE-11).
+ *
+ * When [todayLabel] is null (totalDays >= 1): renders the number + [daysLabel] as before.
+ */
 @Suppress("LongParameterList")
 @Composable
 private fun EventCardCountdown(
   totalDays: Int,
-  daysLabel: String,
+  todayLabel: String?,
+  daysLabel: String?,
   title: String,
   heroColor: androidx.compose.ui.graphics.Color,
   onContainerColor: androidx.compose.ui.graphics.Color,
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    // Large number slot — replaced by "Today" for same-day events (bug #165).
     Text(
-      text = totalDays.toString(),
+      text = todayLabel ?: totalDays.toString(),
       style = MaterialTheme.typography.displaySmall,
       color = heroColor,
       maxLines = 1,
-    )
-    Text(
-      text = daysLabel,
-      style = MaterialTheme.typography.labelMedium,
-      color = onContainerColor,
-      maxLines = 1,
       overflow = TextOverflow.Ellipsis,
     )
+    // "N days left" label — omitted for same-day (mirrors PastCountdown.Today branch).
+    if (daysLabel != null) {
+      Text(
+        text = daysLabel,
+        style = MaterialTheme.typography.labelMedium,
+        color = onContainerColor,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+    }
     Spacer(modifier = Modifier.height(4.dp))
     Text(
       text = title,
@@ -324,7 +347,7 @@ private fun EventCardFarPreview() {
 @PreviewLightDark
 @Composable
 private fun EventCardTodayPreview() {
-  // 4 hours from now — days=0, still upcoming (hours > 0)
+  // 4 hours from now — totalDays=0, renders "Today"/"Сегодня" label (bug #165 fix, AC-LS-5)
   val todayNow = Clock.System.now()
   DateCountdownTheme {
     Surface {
