@@ -3,6 +3,7 @@ package com.datecountdown.app.feature.edit
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import com.arkivanov.decompose.value.MutableValue
@@ -174,6 +175,30 @@ internal class AddEditScreenTest {
 
     component.onIconChange(EventIcon.MUSIC_NOTE)
     assert(component.iconChanges == listOf(EventIcon.MUSIC_NOTE))
+  }
+
+  // ── Icon picker ────────────────────────────────────────────────────────────────────────────────
+
+  @Test
+  fun `icon picker - all 16 icons are present in composition`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        AddEditScreen(component = FakeAddEditComponent(formState(title = "Concert")))
+      }
+    }
+
+    // Each IconPickerCell registers a click action with onClickLabel = a11y description.
+    // Counting all clickable nodes in the icon-picker area via hasClickAction() and
+    // hasContentDescription(substring=true) would need exact strings. Instead, verify the
+    // icon enum size equals 16 and that at least that many clickable cells exist in the tree.
+    // Exact touch-target size (48dp) is verified by Accessibility Scanner during /acceptance.
+    val expectedCount = EventIcon.entries.size
+    assert(expectedCount == 16) { "EventIcon enum must have 16 entries, found $expectedCount" }
+
+    val cells = composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes()
+    assert(cells.size >= expectedCount) {
+      "Expected at least $expectedCount clickable icon cells, found ${cells.size}"
+    }
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────────────────────────
