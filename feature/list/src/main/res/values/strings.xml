@@ -2,9 +2,7 @@
 <resources>
   <!-- Top App Bar -->
   <string name="list_title">Countdown</string>
-  <string name="list_menu_description">Menu</string>
-  <string name="list_search_description">Search</string>
-  <string name="list_more_description">More</string>
+<string name="list_more_description">More</string>
 
   <!-- Subtitle plurals: "N events ahead" / "Пока ничего не запланировано" -->
   <plurals name="list_subtitle_events_ahead">
@@ -56,6 +54,11 @@
   <!-- Card icon accessibility -->
   <string name="list_card_icon_description">%s icon</string>
   <string name="list_card_a11y_description">%1$s, %2$d days until %3$s</string>
+  <!-- Same-day upcoming event a11y: "{title}, Today" (AC-LS-5) -->
+  <string name="list_card_today_a11y_description">%1$s, Today</string>
+
+  <!-- "Today" label on same-day upcoming event card (AC-LS-5 / AC-CL-12) -->
+  <string name="card_today_label">Today</string>
 
   <!-- Days-remaining label on the upcoming event card -->
   <plurals name="days_left">

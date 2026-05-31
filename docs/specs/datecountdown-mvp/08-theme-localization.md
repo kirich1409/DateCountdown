@@ -16,7 +16,7 @@ modules: [":core:design", ":core:common", ":domain", ":data", ":app", ":feature:
 - **AC-TH-3** На <12 и при недоступности dynamic color — палитра из дизайн-токенов (`m3-app.jsx:3-62`), light/dark.
 - **AC-TH-4** minSdk проекта = 29 (Technical Constraints); поэтому fallback-палитра нужна для 29–31, dynamic — 31+ (Android 12 = API 31).
 - **AC-TH-5** 9 событийных тональных палитр ([01](01-data-model.md) AC-DM-2) **фиксированы** и НЕ зависят от dynamic color/темы — цвет события постоянен (его идентичность). При этом текст на них проходит контраст (см. конвенцию a11y, правило 4).
-- **AC-TH-6** Edge-to-edge: контент отступает от системных баров; полноэкранный счётчик — иммерсивный цветной фон (hero).
+- **AC-TH-6** Edge-to-edge: контент отступает от системных баров; полноэкранный счётчик — иммерсивный цветной фон (hero). Для экрана списка (`:feature:list`) — иммерсивный app-bar: `LargeTopAppBar` с `containerColor = Color.Transparent` в развёрнутом состоянии и `scrolledContainerColor = surfaceContainer` при прокрутке. Карточки прокручиваются **под** баром (scroll-under), top `contentPadding` грида равен высоте бара. Это обеспечивает визуальную глубину при старте и читаемость заголовка при прокрутке. Непрозрачный app-bar не удовлетворяет этому AC — ему достаточно «отступает от баров».
 
 ## Шрифты (AC-TH)
 - **AC-TH-7** Roboto Flex (variable) и Material Symbols Rounded поставляются **в APK (bundled)**; приложение НЕ делает сетевых запросов за шрифтами.
