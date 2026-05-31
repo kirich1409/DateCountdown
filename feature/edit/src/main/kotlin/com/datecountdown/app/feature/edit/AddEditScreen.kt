@@ -63,10 +63,12 @@ import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
@@ -297,20 +299,27 @@ private fun AddEditFormContent(
 
   Scaffold(
     topBar = {
+      // AC-AE-16: top bar traverses AFTER the form so Save is last (a11y rule 7).
       AddEditTopBar(
         isEditMode = isEditMode,
         saveEnabled = saveEnabled,
         isSaving = state.isSaving,
         onClose = component::onDismissRequest,
         onSave = component::onSaveClick,
+        modifier = Modifier.semantics {
+          isTraversalGroup = true
+          traversalIndex = 1f
+        },
       )
     },
     modifier = modifier,
   ) { innerPadding ->
+    // Form fields traversed before top bar (traversalIndex 0f < 1f).
     Column(
       modifier = Modifier
         .fillMaxSize()
         .padding(innerPadding)
+        .semantics { isTraversalGroup = true; traversalIndex = 0f }
         .verticalScroll(rememberScrollState())
         .padding(horizontal = 16.dp, vertical = 8.dp),
       verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -371,6 +380,7 @@ private fun AddEditFormContent(
 // Top bar
 // ---------------------------------------------------------------------------
 
+@Suppress("LongParameterList")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddEditTopBar(
@@ -379,8 +389,10 @@ private fun AddEditTopBar(
   isSaving: Boolean,
   onClose: () -> Unit,
   onSave: () -> Unit,
+  modifier: Modifier = Modifier,
 ) {
   TopAppBar(
+    modifier = modifier,
     title = {
       Text(
         text = if (isEditMode) {

@@ -1,5 +1,7 @@
 package com.datecountdown.app.feature.edit
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -174,6 +176,43 @@ internal class AddEditScreenTest {
 
     component.onIconChange(EventIcon.MUSIC_NOTE)
     assert(component.iconChanges == listOf(EventIcon.MUSIC_NOTE))
+  }
+
+  // ── Traversal order (AC-AE-16, a11y rule 7) ───────────────────────────────────────────────────
+
+  @Test
+  fun `top bar has traversalIndex 1f so it is visited after form fields`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        AddEditScreen(component = FakeAddEditComponent(formState(title = "Concert")))
+      }
+    }
+
+    // Verify the top bar traversal group (index=1f) exists in the tree.
+    // Lower index = visited first; top bar at 1f is visited after form group at 0f.
+    val topBarNodes = composeRule.onAllNodes(
+      SemanticsMatcher.expectValue(SemanticsProperties.TraversalIndex, 1f),
+    ).fetchSemanticsNodes()
+    assert(topBarNodes.isNotEmpty()) {
+      "Expected a semantics node with traversalIndex=1f (top bar) — none found."
+    }
+  }
+
+  @Test
+  fun `form column has traversalIndex 0f so it is visited before top bar`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        AddEditScreen(component = FakeAddEditComponent(formState(title = "Concert")))
+      }
+    }
+
+    // Form group at index=0f must also be present so the relative order is complete.
+    val formNodes = composeRule.onAllNodes(
+      SemanticsMatcher.expectValue(SemanticsProperties.TraversalIndex, 0f),
+    ).fetchSemanticsNodes()
+    assert(formNodes.isNotEmpty()) {
+      "Expected a semantics node with traversalIndex=0f (form column) — none found."
+    }
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────────────────────────
