@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -63,6 +65,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -77,6 +80,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -89,6 +93,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.datecountdown.app.core.design.theme.BlobShape
@@ -233,21 +238,32 @@ internal fun EventListScreenContent(
   ) { innerPadding ->
     // Banner is hoisted above the state branch so it renders in Loading / Error states too (AC-NT-12).
     val permissionState = LocalNotificationPermissionState.current
-    Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+    // Edge-to-edge: the Column itself has no padding so the grid can scroll under the transparent
+    // top app bar. Each branch is responsible for consuming innerPadding correctly:
+    //  - Banner (when shown): top-shifts itself below the app bar; the grid then needs no top padding.
+    //  - Grid (no banner): top contentPadding equals innerPadding.top so the first card starts
+    //    visually below the bar and scrolls underneath it (scroll-under / immersive).
+    //  - Loading / Error / GlobalEmpty: are static, receive the full innerPadding as padding.
+    Column(modifier = Modifier.fillMaxSize()) {
       if (permissionState.shouldShowBanner) {
         NotificationBanner(
           onBannerClick = permissionState.triggerRequest,
-          modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+          modifier = Modifier.padding(
+            start = 16.dp,
+            end = 16.dp,
+            top = innerPadding.calculateTopPadding() + 8.dp,
+            bottom = 8.dp,
+          ),
         )
       }
       when (state) {
         EventListState.Loading -> LoadingContent(
-          modifier = Modifier.weight(weight = 1f),
+          modifier = Modifier.weight(weight = 1f).padding(innerPadding),
         )
 
         is EventListState.Error -> ErrorContent(
           message = stringResource(R.string.list_error_message),
-          modifier = Modifier.weight(weight = 1f),
+          modifier = Modifier.weight(weight = 1f).padding(innerPadding),
         )
 
         is EventListState.Content -> ContentBody(
@@ -257,6 +273,15 @@ internal fun EventListScreenContent(
           onAddClick = onAddClick,
           onDelete = onDelete,
           onTogglePast = onTogglePast,
+          // When the banner is shown, top inset is already consumed by the banner above.
+          gridTopPadding = if (permissionState.shouldShowBanner) {
+            8.dp
+          } else {
+            innerPadding.calculateTopPadding() + 8.dp
+          },
+          gridBottomPadding = innerPadding.calculateBottomPadding() + 96.dp,
+          gridStartPadding = innerPadding.calculateStartPadding(LocalLayoutDirection.current) + 16.dp,
+          gridEndPadding = innerPadding.calculateEndPadding(LocalLayoutDirection.current) + 16.dp,
           modifier = Modifier.weight(weight = 1f),
         )
       }
@@ -346,6 +371,10 @@ private fun ContentBody(
   onAddClick: () -> Unit,
   onDelete: (id: EventId) -> Unit,
   onTogglePast: () -> Unit,
+  gridTopPadding: Dp,
+  gridBottomPadding: Dp,
+  gridStartPadding: Dp,
+  gridEndPadding: Dp,
   modifier: Modifier = Modifier,
 ) {
   if (isGlobalEmpty) {
@@ -359,6 +388,10 @@ private fun ContentBody(
       onAddClick = onAddClick,
       onDelete = onDelete,
       onTogglePast = onTogglePast,
+      topPadding = gridTopPadding,
+      bottomPadding = gridBottomPadding,
+      startPadding = gridStartPadding,
+      endPadding = gridEndPadding,
       modifier = modifier,
     )
   }
@@ -388,6 +421,12 @@ private fun ListTopBar(
       }
     },
     modifier = modifier,
+    // Edge-to-edge (AC-TH-6): transparent in expanded state so cards scroll visibly underneath;
+    // surfaceContainer when collapsed so the title remains legible over scrolled card content.
+    colors = TopAppBarDefaults.largeTopAppBarColors(
+      containerColor = Color.Transparent,
+      scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+    ),
     actions = {
       // AC-LS-2 / AC-LS-19: more_vert is active — opens the settings menu.
       Box {
@@ -566,16 +605,23 @@ private fun EventsGrid(
   onAddClick: () -> Unit,
   onDelete: (id: EventId) -> Unit,
   onTogglePast: () -> Unit,
+  // Edge-to-edge: padding is passed from the parent so the grid scrolls under the transparent
+  // top app bar. topPadding already includes the app bar height so the first card is visually
+  // below the bar and scrolls underneath it.
+  topPadding: Dp = 8.dp,
+  bottomPadding: Dp = 96.dp,
+  startPadding: Dp = 16.dp,
+  endPadding: Dp = 16.dp,
   modifier: Modifier = Modifier,
 ) {
   LazyVerticalGrid(
     columns = GridCells.Fixed(count = 2),
     modifier = modifier,
     contentPadding = PaddingValues(
-      start = 16.dp,
-      end = 16.dp,
-      top = 8.dp,
-      bottom = 96.dp, // reserve space for the FAB
+      start = startPadding,
+      end = endPadding,
+      top = topPadding,
+      bottom = bottomPadding,
     ),
     verticalArrangement = Arrangement.spacedBy(12.dp),
     horizontalArrangement = Arrangement.spacedBy(12.dp),
