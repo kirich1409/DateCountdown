@@ -2,9 +2,7 @@
 <resources>
   <!-- Top App Bar -->
   <string name="list_title">Обратный отсчёт</string>
-  <string name="list_menu_description">Меню</string>
-  <string name="list_search_description">Поиск</string>
-  <string name="list_more_description">Ещё</string>
+<string name="list_more_description">Ещё</string>
 
   <!-- Subtitle plurals: "N событий впереди" / "Пока ничего не запланировано" -->
   <plurals name="list_subtitle_events_ahead">

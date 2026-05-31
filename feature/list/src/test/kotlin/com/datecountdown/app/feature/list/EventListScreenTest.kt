@@ -2,6 +2,7 @@ package com.datecountdown.app.feature.list
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import com.arkivanov.decompose.value.MutableValue
@@ -25,6 +26,41 @@ internal class EventListScreenTest {
 
   @get:Rule
   val composeRule = createComposeRule()
+
+  // ── Top App Bar ───────────────────────────────────────────────────────────────────────────────
+
+  @Test
+  fun `top bar - menu icon is absent`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(component = FakeEventListComponent(state = EventListState.Loading))
+      }
+    }
+
+    composeRule.onNodeWithContentDescription("Menu").assertDoesNotExist()
+  }
+
+  @Test
+  fun `top bar - search icon is absent`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(component = FakeEventListComponent(state = EventListState.Loading))
+      }
+    }
+
+    composeRule.onNodeWithContentDescription("Search").assertDoesNotExist()
+  }
+
+  @Test
+  fun `top bar - more vert icon is present`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(component = FakeEventListComponent(state = EventListState.Loading))
+      }
+    }
+
+    composeRule.onNodeWithContentDescription("More").assertIsDisplayed()
+  }
 
   // ── Loading ────────────────────────────────────────────────────────────────────────────────────
 
