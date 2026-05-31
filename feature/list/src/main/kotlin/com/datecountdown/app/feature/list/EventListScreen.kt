@@ -724,7 +724,8 @@ private fun SwipeDeleteBackground(modifier: Modifier = Modifier) {
       .fillMaxSize()
       .background(
         color = MaterialTheme.colorScheme.errorContainer,
-        shape = MaterialTheme.shapes.medium,
+        // Match EventCardShape (28.dp) so background corners don't bleed past the card outline.
+        shape = EventCardShape,
       ),
     contentAlignment = Alignment.CenterEnd,
   ) {
