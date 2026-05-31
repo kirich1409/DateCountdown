@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -96,6 +98,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.datecountdown.app.core.design.theme.BlobShape
+import com.datecountdown.app.core.design.theme.ContentSize
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
 import com.datecountdown.app.core.design.theme.LocalNotificationPermissionState
 import com.datecountdown.app.core.design.theme.EventPaletteId
@@ -630,8 +633,11 @@ private fun EventsGrid(
   modifier: Modifier = Modifier,
 ) {
   LazyVerticalGrid(
-    columns = GridCells.Fixed(count = 2),
-    modifier = modifier,
+    columns = GridCells.Adaptive(minSize = ContentSize.GridCardMin),
+    modifier = modifier
+      .fillMaxWidth()
+      .wrapContentWidth(Alignment.CenterHorizontally)
+      .widthIn(max = ContentSize.GridContainerMax),
     contentPadding = PaddingValues(
       start = startPadding,
       end = endPadding,
@@ -837,7 +843,9 @@ private fun PastSectionHeader(
       text = stringResource(R.string.list_past_section_title, count),
       style = MaterialTheme.typography.titleSmall,
       color = MaterialTheme.colorScheme.onSurface,
-      modifier = Modifier.weight(weight = 1f),
+      modifier = Modifier
+        .weight(weight = 1f)
+        .widthIn(max = ContentSize.ReadableTextMax),
     )
     val label = if (collapsed) {
       stringResource(R.string.list_past_expand)
@@ -874,7 +882,11 @@ private fun GlobalEmptyState(
   modifier: Modifier = Modifier,
 ) {
   Column(
-    modifier = modifier.padding(horizontal = 32.dp),
+    modifier = modifier
+      .fillMaxWidth()
+      .wrapContentWidth(Alignment.CenterHorizontally)
+      .widthIn(max = ContentSize.ReadableTextMax)
+      .padding(horizontal = 32.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.Center,
   ) {
@@ -914,11 +926,12 @@ private fun GlobalEmptyState(
       text = stringResource(R.string.list_empty_body),
       style = MaterialTheme.typography.bodyMedium,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.widthIn(max = ContentSize.ReadableTextMax),
     )
 
     Spacer(modifier = Modifier.height(32.dp))
 
-    Button(onClick = onAddClick, modifier = Modifier.fillMaxWidth()) {
+    Button(onClick = onAddClick, modifier = Modifier.widthIn(max = ContentSize.ButtonMax)) {
       Text(stringResource(R.string.list_fab_label))
     }
   }
@@ -952,7 +965,10 @@ private fun PartialEmptyState(
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    OutlinedButton(onClick = onAddClick) {
+    OutlinedButton(
+      onClick = onAddClick,
+      modifier = Modifier.widthIn(max = ContentSize.ButtonMax),
+    ) {
       Text(stringResource(R.string.list_fab_label))
     }
   }
