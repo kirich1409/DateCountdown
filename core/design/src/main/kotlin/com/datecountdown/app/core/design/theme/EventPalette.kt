@@ -224,7 +224,7 @@ private fun EventPaletteId.darkPalette(): EventPalette = when (this) {
  *
  * Feature-module usage:
  * ```kotlin
- * val palette = eventPaletteByIndex(event.color.ordinal, dark = isSystemInDarkTheme())
+ * val palette = eventPaletteByIndex(event.color.ordinal, dark = LocalResolvedDarkTheme.current)
  * ```
  *
  * @throws IndexOutOfBoundsException if [index] is outside 0..8.

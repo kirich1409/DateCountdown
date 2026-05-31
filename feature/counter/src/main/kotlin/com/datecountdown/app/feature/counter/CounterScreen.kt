@@ -6,7 +6,7 @@ import android.app.Activity
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.datecountdown.app.core.design.theme.LocalResolvedDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -247,13 +247,15 @@ private fun UpcomingCounter(
   onDeleteClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val isDark = isSystemInDarkTheme()
+  val isDark = LocalResolvedDarkTheme.current
   val palette = remember(event.color.ordinal, isDark) {
     eventPaletteByIndex(index = event.color.ordinal, dark = isDark)
   }
   // AC-CL-18: per-palette minimum scrim to ensure white text ≥4.5:1 contrast on glass cells.
   // glassAlpha mirrors GlassSurface.kt tier constants (GLASS_ALPHA_DEFAULT=0.16 / GLASS_ALPHA_LEGACY=0.26).
   // MUST stay in sync with GlassSurface — see #149 for the planned design-token extraction.
+  // isDark is now LocalResolvedDarkTheme.current (fix #169): a forced-LIGHT theme on a dark system
+  // correctly applies the light-mode scrim; forced-DARK skips the black scrim as intended.
   val scrimColor = remember(palette.hero, isDark) {
     if (isDark) {
       // dark hero is light → black scrim would reduce contrast, so disabled.

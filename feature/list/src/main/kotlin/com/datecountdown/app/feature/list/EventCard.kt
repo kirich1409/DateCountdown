@@ -4,7 +4,7 @@ package com.datecountdown.app.feature.list
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.datecountdown.app.core.design.theme.LocalResolvedDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -102,7 +102,7 @@ internal fun EventCard(
   now: Instant,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
-  isDark: Boolean = isSystemInDarkTheme(),
+  isDark: Boolean = LocalResolvedDarkTheme.current,
 ) {
   val palette = remember(event.color.ordinal, isDark) {
     eventPaletteByIndex(index = event.color.ordinal, dark = isDark)
@@ -312,7 +312,6 @@ private fun EventCardNearPreview() {
           icon = DomainEventIcon.FLIGHT,
         ),
         now = previewNowCard,
-        isDark = isSystemInDarkTheme(),
         onClick = {},
         modifier = Modifier.size(180.dp),
       )
@@ -335,7 +334,6 @@ private fun EventCardFarPreview() {
           icon = DomainEventIcon.FAVORITE,
         ),
         now = previewNowCard,
-        isDark = isSystemInDarkTheme(),
         onClick = {},
         modifier = Modifier.size(180.dp),
       )
@@ -361,7 +359,6 @@ private fun EventCardTodayPreview() {
           createdAt = todayNow,
         ),
         now = todayNow,
-        isDark = isSystemInDarkTheme(),
         onClick = {},
         modifier = Modifier.size(180.dp),
       )
@@ -403,7 +400,6 @@ private fun EventCardAllPalettesPreview() {
               icon = icons[index % icons.size],
             ),
             now = previewNowCard,
-            isDark = isSystemInDarkTheme(),
             onClick = {},
           )
         }

@@ -11,7 +11,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.datecountdown.app.core.design.theme.LocalResolvedDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -184,7 +184,7 @@ private fun AddEditFormContent(
   component: AddEditComponent,
   modifier: Modifier = Modifier,
 ) {
-  val isDark = isSystemInDarkTheme()
+  val isDark = LocalResolvedDarkTheme.current
   val saveEnabled = state.title.trim().isNotEmpty() && !state.isSaving
 
   // Picker visibility — survives config change

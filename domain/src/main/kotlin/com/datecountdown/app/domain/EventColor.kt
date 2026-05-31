@@ -8,8 +8,11 @@ package com.datecountdown.app.domain
  * the ordinal values; instead use `EventColor.ordinal` as a direct index:
  *
  * ```kotlin
- * val palette = eventPaletteByIndex(event.color.ordinal, dark = isSystemInDarkTheme())
+ * val palette = eventPaletteByIndex(event.color.ordinal, dark = LocalResolvedDarkTheme.current)
  * ```
+ *
+ * `LocalResolvedDarkTheme` lives in `:core:design` and provides the theme-mode-resolved
+ * dark flag; prefer it over `isSystemInDarkTheme()` directly.
  *
  * Entry order is fixed:
  *   0=ORANGE, 1=PINK, 2=BLUE, 3=PURPLE, 4=INDIGO, 5=TEAL, 6=GREEN, 7=RED, 8=AMBER.
