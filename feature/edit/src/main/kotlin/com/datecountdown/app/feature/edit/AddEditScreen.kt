@@ -67,6 +67,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
@@ -613,12 +614,13 @@ private fun ColorSwatch(
   } else {
     stringResource(R.string.add_edit_color_not_selected, colorName)
   }
-  val swatchShape = if (isSelected) RoundedCornerShape(8.dp) else CircleShape
+  val swatchShape = if (isSelected) RoundedCornerShape(12.dp) else CircleShape
 
   // 48dp touch target wrapping 40dp visual swatch (AC-AE-5)
   Box(
     modifier = modifier
       .size(48.dp)
+      .testTag("color_swatch_${color.ordinal}")
       .clickable(
         role = Role.RadioButton,
         onClickLabel = a11yDesc,
@@ -634,12 +636,14 @@ private fun ColorSwatch(
       modifier = Modifier
         .size(40.dp)
         .clip(swatchShape)
-        .background(palette.hero)
+        // Container (pastel) fill per design spec m3-app.jsx:836 — hero was incorrect.
+        .background(palette.container)
         .then(
           if (isSelected) {
+            // Inset selection ring in hero tone (m3-app.jsx:838 inset 0 0 0 3px hero).
             Modifier.border(
-              width = 2.dp,
-              color = MaterialTheme.colorScheme.onSurface,
+              width = 3.dp,
+              color = palette.hero,
               shape = swatchShape,
             )
           } else {
@@ -652,7 +656,8 @@ private fun ColorSwatch(
         Icon(
           imageVector = Icons.Filled.Check,
           contentDescription = null,
-          tint = palette.onHero,
+          // onContainer for contrast on container-filled swatch (was onHero).
+          tint = palette.onContainer,
           modifier = Modifier.size(20.dp),
         )
       }

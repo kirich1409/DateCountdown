@@ -3,7 +3,9 @@ package com.datecountdown.app.feature.edit
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
@@ -176,15 +178,30 @@ internal class AddEditScreenTest {
     assert(component.iconChanges == listOf(EventIcon.MUSIC_NOTE))
   }
 
+  // ── Color swatch ──────────────────────────────────────────────────────────────────────────────
+
+  @Test
+  fun `selected color swatch has selected semantics`() {
+    // EventColor.BLUE is ordinal=2, so testTag="color_swatch_2"
+    composeRule.setContent {
+      DateCountdownTheme {
+        AddEditScreen(component = FakeAddEditComponent(formState(title = "Concert", color = EventColor.BLUE)))
+      }
+    }
+
+    composeRule.onNodeWithTag("color_swatch_${EventColor.BLUE.ordinal}").assertIsSelected()
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────────────────────────────
 
   private fun formState(
     title: String,
+    color: EventColor = EventColor.BLUE,
     isSaving: Boolean = false,
   ): AddEditState.Form = AddEditState.Form(
     title = title,
     targetDateTime = Instant.parse("2027-10-01T18:00:00Z"),
-    color = EventColor.BLUE,
+    color = color,
     icon = EventIcon.CELEBRATION,
     isSaving = isSaving,
   )
