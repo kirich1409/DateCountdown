@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -452,10 +453,15 @@ private fun PastCounter(
           }
 
           // AC-PE-7: chip "СОБЫТИЕ В ПРОШЛОМ" with errorContainer colors.
+          // AC-PE-17: clearAndSetSemantics replaces the AssistChip's built-in Role.Button +
+          // OnClick action with a plain contentDescription, so TalkBack reads the label as
+          // a static status text and does not announce "double tap to activate".
+          val pastChipDesc = stringResource(R.string.counter_chip_past)
           @Suppress("EmptyFunctionBlock")
           AssistChip(
-            onClick = {},  // non-interactive — visual status chip only (AC-PE-17)
-            label = { Text(stringResource(R.string.counter_chip_past)) },
+            onClick = {},  // no-op: required by AssistChip API; role removed via clearAndSetSemantics
+            label = { Text(pastChipDesc) },
+            modifier = Modifier.clearAndSetSemantics { contentDescription = pastChipDesc },
             colors = AssistChipDefaults.assistChipColors(
               containerColor = MaterialTheme.colorScheme.errorContainer,
               labelColor = MaterialTheme.colorScheme.onErrorContainer,
