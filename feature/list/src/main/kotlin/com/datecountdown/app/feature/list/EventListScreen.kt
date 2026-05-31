@@ -197,6 +197,9 @@ internal fun EventListScreenContent(
   val contentState = state as? EventListState.Content
   val upcomingCount = contentState?.upcoming?.size ?: 0
   val isGlobalEmpty = contentState?.upcoming?.isEmpty() == true && contentState.past.isEmpty()
+  // AC-LS-14: FAB is suppressed when either empty-state CTA is shown (global or partial),
+  // to avoid two identical "New event" controls competing on screen.
+  val isEmptyStateShown = contentState?.upcoming?.isEmpty() == true
   val subtitle = buildSubtitle(isGlobalEmpty = isGlobalEmpty, upcomingCount = upcomingCount)
 
   if (showSettingsDialog) {
@@ -219,7 +222,7 @@ internal fun EventListScreenContent(
         onSettingsClick = { showSettingsDialog = true },
       )
     },
-    floatingActionButton = { ListFab(onClick = onAddClick) },
+    floatingActionButton = { if (!isEmptyStateShown) ListFab(onClick = onAddClick) },
     snackbarHost = {
       // AC-LS-21: liveRegion = Polite so screen readers announce snackbar content.
       SnackbarHost(
@@ -941,7 +944,7 @@ private fun ListFab(
       )
     },
     onClick = onClick,
-    modifier = modifier,
+    modifier = modifier.testTag("list_fab"),
   )
 }
 

@@ -77,6 +77,57 @@ internal class EventListScreenTest {
   }
 
   @Test
+  fun `global empty state - FAB is not shown (AC-LS-14)`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(
+          component = FakeEventListComponent(
+            state = EventListState.Content(
+              upcoming = emptyList(),
+              past = emptyList(),
+              pastCollapsed = false,
+              pendingDelete = null,
+            ),
+          ),
+        )
+      }
+    }
+
+    composeRule.onNodeWithTag("list_fab").assertDoesNotExist()
+  }
+
+  @Test
+  fun `partial empty state - FAB is not shown (AC-LS-14)`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(
+          component = FakeEventListComponent(
+            state = EventListState.Content(
+              upcoming = emptyList(),
+              past = listOf(testEvent(id = "past-1", title = "Past Event")),
+              pastCollapsed = false,
+              pendingDelete = null,
+            ),
+          ),
+        )
+      }
+    }
+
+    composeRule.onNodeWithTag("list_fab").assertDoesNotExist()
+  }
+
+  @Test
+  fun `content with events - FAB is displayed (AC-LS-6)`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(component = FakeEventListComponent(state = contentWithTwoEvents()))
+      }
+    }
+
+    composeRule.onNodeWithTag("list_fab").assertIsDisplayed()
+  }
+
+  @Test
   fun `global empty state - hourglass icon is present in blob`() {
     composeRule.setContent {
       DateCountdownTheme {
