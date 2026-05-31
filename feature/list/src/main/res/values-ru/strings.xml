@@ -56,6 +56,11 @@
   <!-- Card icon accessibility -->
   <string name="list_card_icon_description">Иконка %s</string>
   <string name="list_card_a11y_description">%1$s, %2$d дней до %3$s</string>
+  <!-- Same-day upcoming event a11y: "{title}, Сегодня" (AC-LS-5) -->
+  <string name="list_card_today_a11y_description">%1$s, Сегодня</string>
+
+  <!-- «Сегодня» на карточке предстоящего события в тот же день (AC-LS-5 / AC-CL-12) -->
+  <string name="card_today_label">Сегодня</string>
 
   <!-- Days-remaining label on the upcoming event card -->
   <plurals name="days_left">
