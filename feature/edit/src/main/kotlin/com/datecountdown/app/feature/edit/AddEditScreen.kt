@@ -15,6 +15,8 @@ import com.datecountdown.app.core.design.theme.LocalResolvedDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -676,6 +678,7 @@ private fun ColorSwatch(
 // Icon picker section (AC-AE-6)
 // ---------------------------------------------------------------------------
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun IconPickerSection(
   selected: DomainEventIcon,
@@ -688,29 +691,18 @@ private fun IconPickerSection(
       style = MaterialTheme.typography.labelLarge,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    // 8 columns × 2 rows = 16 icons (AC-AE-6, matches эталон)
-    val icons = DomainEventIcon.entries
-    val columnCount = 8
-    val rowCount = (icons.size + columnCount - 1) / columnCount
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      repeat(rowCount) { row ->
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          repeat(columnCount) { col ->
-            val index = row * columnCount + col
-            if (index < icons.size) {
-              val domainIcon = icons[index]
-              IconPickerCell(
-                domainIcon = domainIcon,
-                isSelected = domainIcon == selected,
-                onClick = { onSelect(domainIcon) },
-                modifier = Modifier.weight(1f),
-              )
-            } else {
-              // Empty placeholder to maintain grid alignment
-              Spacer(modifier = Modifier.weight(1f))
-            }
-          }
-        }
+    // FlowRow wraps icons to new rows automatically — guarantees real 48dp touch targets
+    // on any screen width (8×2 fixed grid exceeded 412dp at 48dp/cell + gaps).
+    FlowRow(
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      DomainEventIcon.entries.forEach { domainIcon ->
+        IconPickerCell(
+          domainIcon = domainIcon,
+          isSelected = domainIcon == selected,
+          onClick = { onSelect(domainIcon) },
+        )
       }
     }
   }
