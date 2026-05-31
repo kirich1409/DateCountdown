@@ -332,7 +332,16 @@ private fun UpcomingCounter(
         // At ≤600dp (phones): cap = 96sp (unchanged). Above 600dp: linearly ramp to 160sp
         // at 1280dp. Derived from usable content width, not the device diagonal.
         // Values at key breakpoints: 360dp→96sp, 600dp→96sp, 800dp→≈115sp, 1280dp→160sp.
-        val upcomingMaxFontSize = adaptivePrimaryMaxFontSize(maxWidth)
+        // remember(maxWidth): derivation depends only on window width; memoised to avoid
+        // recomputing on every countdown tick (~1 Hz). Recomputes only on resize.
+        val upcomingMaxFontSize = remember(maxWidth) { adaptivePrimaryMaxFontSize(maxWidth) }
+
+        // #189: center the content cluster vertically only on large windows (maxWidth ≥ 520dp).
+        // On phone the window is always narrower than CounterColumnMax — centering is skipped
+        // and the original top-pinned layout (Arrangement.spacedBy + trailing weight spacer)
+        // is preserved byte-for-byte.
+        // remember(maxWidth): same resize-only dependency as upcomingMaxFontSize above.
+        val centerContent = remember(maxWidth) { maxWidth >= ContentSize.CounterColumnMax }
 
         Column(
           modifier = Modifier
@@ -344,10 +353,14 @@ private fun UpcomingCounter(
             .widthIn(max = ContentSize.CounterColumnMax)
             .padding(horizontal = 24.dp),
           horizontalAlignment = Alignment.CenterHorizontally,
-          // #189: CenterVertically distributes free space above and below the content cluster.
-          // On phone the content nearly fills the height so the shift is minimal. The trailing
-          // Spacer(weight(1f)) that pinned content to the top is removed.
-          verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
+          // #189: on large windows (centerContent=true), distribute free space symmetrically
+          // around the content cluster. On phone, top-pin with a trailing weight spacer (original
+          // layout from origin/main).
+          verticalArrangement = if (centerContent) {
+            Arrangement.spacedBy(24.dp, Alignment.CenterVertically)
+          } else {
+            Arrangement.spacedBy(24.dp)
+          },
         ) {
           Spacer(modifier = Modifier.height(8.dp))
 
@@ -370,6 +383,12 @@ private fun UpcomingCounter(
             scrimColor = scrimColor,
             onHeroColor = palette.onHero,
           )
+
+          // Phone branch: trailing spacer pins the cluster to the top (matches origin/main).
+          // Large-window branch: CenterVertically above makes this spacer redundant.
+          if (!centerContent) {
+            Spacer(modifier = Modifier.weight(1f))
+          }
         }
       }
     }
@@ -455,7 +474,14 @@ private fun PastCounter(
           .padding(innerPadding),
       ) {
         // #190: same adaptive font derivation as UpcomingCounter.
-        val pastMaxFontSize = adaptivePrimaryMaxFontSize(maxWidth)
+        // remember(maxWidth): recomputes only on resize, not on every countdown tick (~1 Hz).
+        val pastMaxFontSize = remember(maxWidth) { adaptivePrimaryMaxFontSize(maxWidth) }
+
+        // #189: center the header+primary cluster above the pinned button row only on large
+        // windows. On phone (maxWidth < CounterColumnMax=520dp), the layout is top-pinned —
+        // identical to origin/main — with only the trailing Spacer(weight(1f)) before buttons.
+        // remember(maxWidth): same resize-only dependency as pastMaxFontSize above.
+        val centerContent = remember(maxWidth) { maxWidth >= ContentSize.CounterColumnMax }
 
         Column(
           modifier = Modifier
@@ -465,10 +491,12 @@ private fun PastCounter(
             .widthIn(max = ContentSize.CounterColumnMax),
           horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-          // #189: symmetric spacer pair around the upper cluster so it centers vertically.
-          // The button row stays at the bottom (it follows the trailing weight(1f) spacer).
-          // CenterVertically on the outer Column is NOT used because it would displace the buttons.
-          Spacer(modifier = Modifier.weight(1f))
+          // On large windows: a leading spacer pushes the header+primary cluster down from the
+          // top so that the cluster centers within the space above the pinned button row.
+          // On phone: omitted — cluster starts at the top (original top-pinned behavior).
+          if (centerContent) {
+            Spacer(modifier = Modifier.weight(1f))
+          }
 
           Spacer(modifier = Modifier.height(8.dp))
 
@@ -499,14 +527,12 @@ private fun PastCounter(
               )
             }
 
-            // #192: cap title line length; no-op inside the 520dp column on phone.
             Text(
               text = event.title,
               style = MaterialTheme.typography.headlineMedium,
               color = MaterialTheme.colorScheme.onSurface,
               maxLines = 2,
               overflow = TextOverflow.Ellipsis,
-              modifier = Modifier.widthIn(max = ContentSize.ReadableTextMax),
             )
 
             Text(
@@ -542,13 +568,20 @@ private fun PastCounter(
             modifier = Modifier.padding(horizontal = 24.dp),
           )
 
+          // Trailing spacer: pins the button row to the bottom in both phone and large-window
+          // layouts. On phone this also top-pins the cluster (original behavior). On large windows
+          // the leading spacer above balances this one, centering the header+primary cluster
+          // within the space above the buttons.
           Spacer(modifier = Modifier.weight(1f))
 
           // AC-PE-9: Reschedule + Delete buttons.
-          // #188: cap the button row at ButtonMax and center it so buttons do not stretch to half
-          // of a wide screen. On phone (ButtonMax=360dp, row≈330dp after padding) this is a no-op.
+          // #188: fillMaxWidth so the two weight(1f) buttons divide the full column width; then
+          // wrapContentWidth + widthIn(max=ButtonMax) center and cap the row at 360dp on wide
+          // screens. On phone the row width ≈ column width (≤360dp) so fillMaxWidth is a no-op
+          // relative to the original behavior.
           Row(
             modifier = Modifier
+              .fillMaxWidth()
               .wrapContentWidth(Alignment.CenterHorizontally)
               .widthIn(max = ContentSize.ButtonMax)
               .padding(horizontal = 16.dp)
@@ -730,9 +763,8 @@ private fun CounterHeader(
       letterSpacing = 2.sp,
     )
 
-    // #192: cap title line length so it does not run full-width on tablets.
-    // ReadableTextMax (600dp) > CounterColumnMax (520dp) so inside the capped column this
-    // is effectively a no-op; it becomes visible if CounterColumnMax is ever raised.
+    // Title line length is bounded by CounterColumnMax (520dp) — ReadableTextMax (600dp) would
+    // be a no-op here since the enclosing column is already capped at 520dp.
     Text(
       text = event.title,
       style = MaterialTheme.typography.headlineSmall,
@@ -740,7 +772,6 @@ private fun CounterHeader(
       fontWeight = FontWeight.SemiBold,
       maxLines = 2,
       overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.widthIn(max = ContentSize.ReadableTextMax),
     )
 
     // AC-CL-18: date-chip contrast is theme-dependent.
@@ -796,44 +827,6 @@ private fun CounterDateChip(
 }
 
 // ── Primary number display ────────────────────────────────────────────────────────────────────────
-
-// Floor/ceiling for primary-value autoSize. maxLines=1 + softWrap=false force single-line layout;
-// autoSize then shrinks the font until the text fits rather than wrapping to a second line.
-// 24sp floor: extends coverage to higher fontScale (1.5–2.0) and wider device widths,
-// preventing clipping of values like "245 дней". At fontScale 1.0, autoSize still chooses
-// the maximum font (up to the adaptive cap), so readability is unaffected.
-private val primaryValueMinFontSize = 24.sp
-
-// Base cap used at phone widths (≤600dp). The effective max is raised adaptively on larger
-// screens via adaptivePrimaryMaxFontSize — see #190.
-private val primaryValueMaxFontSize = 96.sp
-
-// Upper ceiling for the adaptive hero-number cap on very wide screens (≥1280dp).
-private val primaryValueMaxFontSizeLarge = 160.sp
-
-/**
- * #190: derives the adaptive primary-value max font size from the available content width.
- *
- * Formula: linearly ramp from 96sp at ≤600dp to 160sp at ≥1280dp.
- *   fraction = ((width - 600) / (1280 - 600)).coerceIn(0, 1)
- *   cap = 96 + 64 * fraction (in sp)
- *
- * Key values:
- *   360dp → 96sp (phone portrait, no change)
- *   600dp → 96sp (threshold, ramp starts here)
- *   800dp → ≈115sp
- *   1280dp → 160sp
- *
- * The width argument is the full BoxWithConstraints.maxWidth, measured BEFORE the
- * CounterColumnMax (520dp) cap is applied, so the ramp fires correctly on wide windows.
- * The 24sp floor (primaryValueMinFontSize) is unaffected.
- */
-private fun adaptivePrimaryMaxFontSize(maxWidth: Dp): TextUnit {
-  val fraction = ((maxWidth.value - 600f) / (1280f - 600f)).coerceIn(0f, 1f)
-  val baseSp = primaryValueMaxFontSize.value
-  val rangeSp = primaryValueMaxFontSizeLarge.value - baseSp
-  return (baseSp + rangeSp * fraction).sp
-}
 
 /**
  * Primary countdown number block.

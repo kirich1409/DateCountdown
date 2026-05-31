@@ -94,6 +94,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
@@ -606,6 +607,31 @@ private fun NotificationBanner(
 // ── Events grid ──────────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Custom [GridCells] that derives the column count from the available cross-axis width and a
+ * target card width, with a minimum of 2 columns.
+ *
+ * Formula: `count = max(2, (availableSize + spacing) / (target.roundToPx() + spacing))`
+ *
+ * The distribution of remaining pixels mirrors [GridCells.Fixed]: the first `remainder` cells
+ * each receive one extra pixel so all content width is consumed evenly.
+ *
+ * equals/hashCode are based on [target] so Compose can correctly skip recomposition
+ * when the instance is stable (mirrors the pattern used by [GridCells.Adaptive] and [GridCells.Fixed]).
+ */
+@Suppress("MagicNumber")
+private data class AdaptiveGridColumns(
+  private val target: Dp,
+) : GridCells {
+  override fun Density.calculateCrossAxisCellSizes(availableSize: Int, spacing: Int): List<Int> {
+    val count = maxOf(2, (availableSize + spacing) / (target.roundToPx() + spacing))
+    val sizeWithoutSpacing = availableSize - spacing * (count - 1)
+    val cellSize = sizeWithoutSpacing / count
+    val remainder = sizeWithoutSpacing % count
+    return List(count) { index -> cellSize + if (index < remainder) 1 else 0 }
+  }
+}
+
+/**
  * 2-column lazy grid containing:
  *  - filter chips row (full-width span)
  *  - upcoming cards (or [PartialEmptyState] when upcoming is empty but past is non-empty)
@@ -633,7 +659,7 @@ private fun EventsGrid(
   modifier: Modifier = Modifier,
 ) {
   LazyVerticalGrid(
-    columns = GridCells.Adaptive(minSize = ContentSize.GridCardMin),
+    columns = AdaptiveGridColumns(target = ContentSize.GridCardTarget),
     modifier = modifier
       .fillMaxWidth()
       .wrapContentWidth(Alignment.CenterHorizontally)
@@ -926,7 +952,6 @@ private fun GlobalEmptyState(
       text = stringResource(R.string.list_empty_body),
       style = MaterialTheme.typography.bodyMedium,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
-      modifier = Modifier.widthIn(max = ContentSize.ReadableTextMax),
     )
 
     Spacer(modifier = Modifier.height(32.dp))

@@ -9,8 +9,12 @@ import androidx.compose.ui.unit.dp
  * a no-op on phone widths (the cap only engages once the window is wider than a phone).
  */
 object ContentSize {
-  /** Min cell width for the adaptive event grid. 135dp keeps 2 columns even at 320dp (minSdk 29). */
-  val GridCardMin: Dp = 135.dp
+  /**
+   * Target card width for the adaptive event grid. The list grid derives its column count from the
+   * available width and this target, with a floor of 2 columns. At phone widths this yields
+   * 2 columns, matching the previous fixed 2-column layout.
+   */
+  val GridCardTarget: Dp = 260.dp
   /** Max width of the grid container on ultra-wide windows so the grid does not stretch unbounded. */
   val GridContainerMax: Dp = 1200.dp
   /** Max width of the counter content column; hero background stays edge-to-edge behind it. */
