@@ -31,6 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
@@ -431,6 +433,10 @@ private fun ListTopBar(
  * Horizontal row of filter chips. In MVP all chips are visual-only: "All" is always selected,
  * tapping any chip is a no-op. Functional filtering is tracked in issue #09 (post-MVP).
  *
+ * The "All" chip always shows a [Icons.Filled.Done] leading icon — M3 FilterChip does NOT
+ * render a checkmark automatically; the icon provides the required non-color selection signal
+ * (a11y rule 2). TalkBack announces "selected" via the chip's built-in selectable semantics.
+ *
  * AC-LS-3, AC-LS-22.
  */
 @Composable
@@ -439,11 +445,22 @@ private fun FilterChipsRow(modifier: Modifier = Modifier) {
     modifier = modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
     horizontalArrangement = Arrangement.spacedBy(8.dp),
   ) {
-    // "All" — always selected. The check-mark is rendered by FilterChip (visual only in MVP).
+    // "All" — always selected. Leading Done icon is the non-color selection signal (a11y rule 2).
+    // M3 FilterChip does not draw a checkmark automatically — the icon must be explicit.
     FilterChip(
       selected = true,
       onClick = { /* no-op: filtering is post-MVP */ },
       label = { Text(stringResource(R.string.list_filter_all)) },
+      leadingIcon = {
+        Icon(
+          imageVector = Icons.Filled.Done,
+          // Decorative — the chip's selectable semantics carry the "selected" state for TalkBack.
+          contentDescription = null,
+          modifier = Modifier
+            .size(FilterChipDefaults.IconSize)
+            .testTag("all_chip_checkmark"),
+        )
+      },
     )
     FilterChip(
       selected = false,

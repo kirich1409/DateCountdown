@@ -1,6 +1,7 @@
 package com.datecountdown.app.feature.list
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -181,6 +182,23 @@ internal class EventListScreenTest {
     }
 
     composeRule.onNodeWithTag("empty_state_hourglass").assertExists()
+  }
+
+  // ── Filter chips ───────────────────────────────────────────────────────────────────────────────
+
+  @Test
+  fun `all chip - shows checkmark icon and is semantically selected`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(component = FakeEventListComponent(state = contentWithTwoEvents()))
+      }
+    }
+
+    // Non-color selection signal: Done icon must be present in the unmerged tree (cd=null →
+    // invisible to merged accessibility tree, so useUnmergedTree = true is required).
+    composeRule.onNodeWithTag("all_chip_checkmark", useUnmergedTree = true).assertExists()
+    // TalkBack signal: chip's selectable semantics announce "selected" via Surface(selected=true).
+    composeRule.onNodeWithText("All").assertIsSelected()
   }
 
   // ── Interactions ───────────────────────────────────────────────────────────────────────────────
