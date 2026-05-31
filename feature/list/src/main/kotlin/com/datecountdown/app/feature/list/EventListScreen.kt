@@ -65,7 +65,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -238,12 +237,21 @@ internal fun EventListScreenContent(
   ) { innerPadding ->
     // Banner is hoisted above the state branch so it renders in Loading / Error states too (AC-NT-12).
     val permissionState = LocalNotificationPermissionState.current
-    // Edge-to-edge: the Column itself has no padding so the grid can scroll under the transparent
-    // top app bar. Each branch is responsible for consuming innerPadding correctly:
-    //  - Banner (when shown): top-shifts itself below the app bar; the grid then needs no top padding.
-    //  - Grid (no banner): top contentPadding equals innerPadding.top so the first card starts
-    //    visually below the bar and scrolls underneath it (scroll-under / immersive).
-    //  - Loading / Error / GlobalEmpty: are static, receive the full innerPadding as padding.
+    val layoutDirection = LocalLayoutDirection.current
+    // Edge-to-edge inset strategy:
+    //  - Banner (when shown): consumes the top inset itself (app bar height + 8 dp gap). Branches
+    //    rendered below the banner must NOT add top inset again — that would double-count it.
+    //  - Grid: top contentPadding = app bar height + 8 dp (or just 8 dp when banner is shown).
+    //    Cards scroll visually under the app bar (immersive scroll-under).
+    //  - Loading / Error / GlobalEmpty: static, centered content. Use the shared
+    //    staticContentPadding below: top is zeroed when the banner already consumed it, otherwise
+    //    equals innerPadding.top. Start/end/bottom are always forwarded from innerPadding.
+    val staticContentPadding = PaddingValues(
+      start = innerPadding.calculateStartPadding(layoutDirection),
+      top = if (permissionState.shouldShowBanner) 0.dp else innerPadding.calculateTopPadding(),
+      end = innerPadding.calculateEndPadding(layoutDirection),
+      bottom = innerPadding.calculateBottomPadding(),
+    )
     Column(modifier = Modifier.fillMaxSize()) {
       if (permissionState.shouldShowBanner) {
         NotificationBanner(
@@ -258,12 +266,12 @@ internal fun EventListScreenContent(
       }
       when (state) {
         EventListState.Loading -> LoadingContent(
-          modifier = Modifier.weight(weight = 1f).padding(innerPadding),
+          modifier = Modifier.weight(weight = 1f).padding(staticContentPadding),
         )
 
         is EventListState.Error -> ErrorContent(
           message = stringResource(R.string.list_error_message),
-          modifier = Modifier.weight(weight = 1f).padding(innerPadding),
+          modifier = Modifier.weight(weight = 1f).padding(staticContentPadding),
         )
 
         is EventListState.Content -> ContentBody(
@@ -273,6 +281,7 @@ internal fun EventListScreenContent(
           onAddClick = onAddClick,
           onDelete = onDelete,
           onTogglePast = onTogglePast,
+          emptyStatePadding = staticContentPadding,
           // When the banner is shown, top inset is already consumed by the banner above.
           gridTopPadding = if (permissionState.shouldShowBanner) {
             8.dp
@@ -280,8 +289,8 @@ internal fun EventListScreenContent(
             innerPadding.calculateTopPadding() + 8.dp
           },
           gridBottomPadding = innerPadding.calculateBottomPadding() + 96.dp,
-          gridStartPadding = innerPadding.calculateStartPadding(LocalLayoutDirection.current) + 16.dp,
-          gridEndPadding = innerPadding.calculateEndPadding(LocalLayoutDirection.current) + 16.dp,
+          gridStartPadding = innerPadding.calculateStartPadding(layoutDirection) + 16.dp,
+          gridEndPadding = innerPadding.calculateEndPadding(layoutDirection) + 16.dp,
           modifier = Modifier.weight(weight = 1f),
         )
       }
@@ -371,6 +380,7 @@ private fun ContentBody(
   onAddClick: () -> Unit,
   onDelete: (id: EventId) -> Unit,
   onTogglePast: () -> Unit,
+  emptyStatePadding: PaddingValues,
   gridTopPadding: Dp,
   gridBottomPadding: Dp,
   gridStartPadding: Dp,
@@ -378,7 +388,7 @@ private fun ContentBody(
   modifier: Modifier = Modifier,
 ) {
   if (isGlobalEmpty) {
-    GlobalEmptyState(onAddClick = onAddClick, modifier = modifier)
+    GlobalEmptyState(onAddClick = onAddClick, modifier = modifier.padding(emptyStatePadding))
   } else {
     EventsGrid(
       upcoming = state.upcoming,
@@ -421,10 +431,15 @@ private fun ListTopBar(
       }
     },
     modifier = modifier,
-    // Edge-to-edge (AC-TH-6): transparent in expanded state so cards scroll visibly underneath;
-    // surfaceContainer when collapsed so the title remains legible over scrolled card content.
+    // Edge-to-edge (AC-TH-6): surface background in all scroll phases so the title is legible
+    // over scrolled card content at every point of the collapse transition. The transparent
+    // background caused a contrast dip in dark theme when the bar was partially collapsed over
+    // light-toned cards (amber / teal). Variant A (opaque surface) is used in preference to a
+    // gradient scrim: it is a single-line change, fully guaranteed in all themes and fontScales,
+    // and AC-TH-6 only requires "edge-to-edge / content scrolls under the bar" — not transparency.
+    // Scroll-under still works: content draws behind an opaque surface-color bar on scroll.
     colors = TopAppBarDefaults.largeTopAppBarColors(
-      containerColor = Color.Transparent,
+      containerColor = MaterialTheme.colorScheme.surface,
       scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
     ),
     actions = {
