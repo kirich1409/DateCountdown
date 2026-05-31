@@ -1,9 +1,14 @@
 package com.datecountdown.app.feature.edit
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
@@ -176,15 +181,91 @@ internal class AddEditScreenTest {
     assert(component.iconChanges == listOf(EventIcon.MUSIC_NOTE))
   }
 
+  // ── Traversal order (AC-AE-16, a11y rule 7) ───────────────────────────────────────────────────
+
+  @Test
+  fun `top bar has traversalIndex 1f so it is visited after form fields`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        AddEditScreen(component = FakeAddEditComponent(formState(title = "Concert")))
+      }
+    }
+
+    // Verify the top bar traversal group (index=1f) exists in the tree.
+    // Lower index = visited first; top bar at 1f is visited after form group at 0f.
+    val topBarNodes = composeRule.onAllNodes(
+      SemanticsMatcher.expectValue(SemanticsProperties.TraversalIndex, 1f),
+    ).fetchSemanticsNodes()
+    assert(topBarNodes.isNotEmpty()) {
+      "Expected a semantics node with traversalIndex=1f (top bar) — none found."
+    }
+  }
+
+  @Test
+  fun `form column has traversalIndex 0f so it is visited before top bar`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        AddEditScreen(component = FakeAddEditComponent(formState(title = "Concert")))
+      }
+    }
+
+    // Form group at index=0f must also be present so the relative order is complete.
+    val formNodes = composeRule.onAllNodes(
+      SemanticsMatcher.expectValue(SemanticsProperties.TraversalIndex, 0f),
+    ).fetchSemanticsNodes()
+    assert(formNodes.isNotEmpty()) {
+      "Expected a semantics node with traversalIndex=0f (form column) — none found."
+    }
+  }
+
+  // ── Icon picker ────────────────────────────────────────────────────────────────────────────────
+
+  @Test
+  fun `icon picker - all 16 icons are present in composition`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        AddEditScreen(component = FakeAddEditComponent(formState(title = "Concert")))
+      }
+    }
+
+    // Each IconPickerCell registers a click action with onClickLabel = a11y description.
+    // Counting all clickable nodes in the icon-picker area via hasClickAction() and
+    // hasContentDescription(substring=true) would need exact strings. Instead, verify the
+    // icon enum size equals 16 and that at least that many clickable cells exist in the tree.
+    // Exact touch-target size (48dp) is verified by Accessibility Scanner during /acceptance.
+    val expectedCount = EventIcon.entries.size
+    assert(expectedCount == 16) { "EventIcon enum must have 16 entries, found $expectedCount" }
+
+    val cells = composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes()
+    assert(cells.size >= expectedCount) {
+      "Expected at least $expectedCount clickable icon cells, found ${cells.size}"
+    }
+  }
+
+  // ── Color swatch ──────────────────────────────────────────────────────────────────────────────
+
+  @Test
+  fun `selected color swatch has selected semantics`() {
+    // EventColor.BLUE is ordinal=2, so testTag="color_swatch_2"
+    composeRule.setContent {
+      DateCountdownTheme {
+        AddEditScreen(component = FakeAddEditComponent(formState(title = "Concert", color = EventColor.BLUE)))
+      }
+    }
+
+    composeRule.onNodeWithTag("color_swatch_${EventColor.BLUE.ordinal}").assertIsSelected()
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────────────────────────────
 
   private fun formState(
     title: String,
+    color: EventColor = EventColor.BLUE,
     isSaving: Boolean = false,
   ): AddEditState.Form = AddEditState.Form(
     title = title,
     targetDateTime = Instant.parse("2027-10-01T18:00:00Z"),
-    color = EventColor.BLUE,
+    color = color,
     icon = EventIcon.CELEBRATION,
     isSaving = isSaving,
   )

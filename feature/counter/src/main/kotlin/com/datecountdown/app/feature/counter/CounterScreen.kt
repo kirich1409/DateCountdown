@@ -6,7 +6,7 @@ import android.app.Activity
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.datecountdown.app.core.design.theme.LocalResolvedDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -246,13 +247,15 @@ private fun UpcomingCounter(
   onDeleteClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val isDark = isSystemInDarkTheme()
+  val isDark = LocalResolvedDarkTheme.current
   val palette = remember(event.color.ordinal, isDark) {
     eventPaletteByIndex(index = event.color.ordinal, dark = isDark)
   }
   // AC-CL-18: per-palette minimum scrim to ensure white text ≥4.5:1 contrast on glass cells.
   // glassAlpha mirrors GlassSurface.kt tier constants (GLASS_ALPHA_DEFAULT=0.16 / GLASS_ALPHA_LEGACY=0.26).
   // MUST stay in sync with GlassSurface — see #149 for the planned design-token extraction.
+  // isDark is now LocalResolvedDarkTheme.current (fix #169): a forced-LIGHT theme on a dark system
+  // correctly applies the light-mode scrim; forced-DARK skips the black scrim as intended.
   val scrimColor = remember(palette.hero, isDark) {
     if (isDark) {
       // dark hero is light → black scrim would reduce contrast, so disabled.
@@ -452,10 +455,15 @@ private fun PastCounter(
           }
 
           // AC-PE-7: chip "СОБЫТИЕ В ПРОШЛОМ" with errorContainer colors.
+          // AC-PE-17: clearAndSetSemantics replaces the AssistChip's built-in Role.Button +
+          // OnClick action with a plain contentDescription, so TalkBack reads the label as
+          // a static status text and does not announce "double tap to activate".
+          val pastChipDesc = stringResource(R.string.counter_chip_past)
           @Suppress("EmptyFunctionBlock")
           AssistChip(
-            onClick = {},  // non-interactive — visual status chip only (AC-PE-17)
-            label = { Text(stringResource(R.string.counter_chip_past)) },
+            onClick = {},  // no-op: required by AssistChip API; role removed via clearAndSetSemantics
+            label = { Text(pastChipDesc) },
+            modifier = Modifier.clearAndSetSemantics { contentDescription = pastChipDesc },
             colors = AssistChipDefaults.assistChipColors(
               containerColor = MaterialTheme.colorScheme.errorContainer,
               labelColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -723,9 +731,7 @@ private fun CounterDateChip(
   AssistChip(
     onClick = {},  // no-op: visual chip only — clearAndSetSemantics neutralises the click role
     label = { Text(text = formattedDate, style = MaterialTheme.typography.bodySmall) },
-    modifier = modifier.semantics(mergeDescendants = false) {
-      contentDescription = formattedDate
-    },
+    modifier = modifier.clearAndSetSemantics { contentDescription = formattedDate },
     colors = AssistChipDefaults.assistChipColors(
       containerColor = containerColor,
       labelColor = labelColor,

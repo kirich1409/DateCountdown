@@ -1,7 +1,9 @@
 package com.datecountdown.app.feature.list
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import com.arkivanov.decompose.value.MutableValue
@@ -25,6 +27,41 @@ internal class EventListScreenTest {
 
   @get:Rule
   val composeRule = createComposeRule()
+
+  // ── Top App Bar ───────────────────────────────────────────────────────────────────────────────
+
+  @Test
+  fun `top bar - menu icon is absent`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(component = FakeEventListComponent(state = EventListState.Loading))
+      }
+    }
+
+    composeRule.onNodeWithContentDescription("Menu").assertDoesNotExist()
+  }
+
+  @Test
+  fun `top bar - search icon is absent`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(component = FakeEventListComponent(state = EventListState.Loading))
+      }
+    }
+
+    composeRule.onNodeWithContentDescription("Search").assertDoesNotExist()
+  }
+
+  @Test
+  fun `top bar - more vert icon is present`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(component = FakeEventListComponent(state = EventListState.Loading))
+      }
+    }
+
+    composeRule.onNodeWithContentDescription("More").assertIsDisplayed()
+  }
 
   // ── Loading ────────────────────────────────────────────────────────────────────────────────────
 
@@ -77,6 +114,57 @@ internal class EventListScreenTest {
   }
 
   @Test
+  fun `global empty state - FAB is not shown (AC-LS-14)`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(
+          component = FakeEventListComponent(
+            state = EventListState.Content(
+              upcoming = emptyList(),
+              past = emptyList(),
+              pastCollapsed = false,
+              pendingDelete = null,
+            ),
+          ),
+        )
+      }
+    }
+
+    composeRule.onNodeWithTag("list_fab").assertDoesNotExist()
+  }
+
+  @Test
+  fun `partial empty state - FAB is not shown (AC-LS-14)`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(
+          component = FakeEventListComponent(
+            state = EventListState.Content(
+              upcoming = emptyList(),
+              past = listOf(testEvent(id = "past-1", title = "Past Event")),
+              pastCollapsed = false,
+              pendingDelete = null,
+            ),
+          ),
+        )
+      }
+    }
+
+    composeRule.onNodeWithTag("list_fab").assertDoesNotExist()
+  }
+
+  @Test
+  fun `content with events - FAB is displayed (AC-LS-6)`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(component = FakeEventListComponent(state = contentWithTwoEvents()))
+      }
+    }
+
+    composeRule.onNodeWithTag("list_fab").assertIsDisplayed()
+  }
+
+  @Test
   fun `global empty state - hourglass icon is present in blob`() {
     composeRule.setContent {
       DateCountdownTheme {
@@ -94,6 +182,23 @@ internal class EventListScreenTest {
     }
 
     composeRule.onNodeWithTag("empty_state_hourglass").assertExists()
+  }
+
+  // ── Filter chips ───────────────────────────────────────────────────────────────────────────────
+
+  @Test
+  fun `all chip - shows checkmark icon and is semantically selected`() {
+    composeRule.setContent {
+      DateCountdownTheme {
+        EventListScreen(component = FakeEventListComponent(state = contentWithTwoEvents()))
+      }
+    }
+
+    // Non-color selection signal: Done icon must be present in the unmerged tree (cd=null →
+    // invisible to merged accessibility tree, so useUnmergedTree = true is required).
+    composeRule.onNodeWithTag("all_chip_checkmark", useUnmergedTree = true).assertExists()
+    // TalkBack signal: chip's selectable semantics announce "selected" via Surface(selected=true).
+    composeRule.onNodeWithText("All").assertIsSelected()
   }
 
   // ── Interactions ───────────────────────────────────────────────────────────────────────────────

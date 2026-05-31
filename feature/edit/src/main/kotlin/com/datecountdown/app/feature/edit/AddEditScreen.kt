@@ -11,10 +11,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.datecountdown.app.core.design.theme.LocalResolvedDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -63,10 +65,13 @@ import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
@@ -182,7 +187,7 @@ private fun AddEditFormContent(
   component: AddEditComponent,
   modifier: Modifier = Modifier,
 ) {
-  val isDark = isSystemInDarkTheme()
+  val isDark = LocalResolvedDarkTheme.current
   val saveEnabled = state.title.trim().isNotEmpty() && !state.isSaving
 
   // Picker visibility — survives config change
@@ -297,20 +302,27 @@ private fun AddEditFormContent(
 
   Scaffold(
     topBar = {
+      // AC-AE-16: top bar traverses AFTER the form so Save is last (a11y rule 7).
       AddEditTopBar(
         isEditMode = isEditMode,
         saveEnabled = saveEnabled,
         isSaving = state.isSaving,
         onClose = component::onDismissRequest,
         onSave = component::onSaveClick,
+        modifier = Modifier.semantics {
+          isTraversalGroup = true
+          traversalIndex = 1f
+        },
       )
     },
     modifier = modifier,
   ) { innerPadding ->
+    // Form fields traversed before top bar (traversalIndex 0f < 1f).
     Column(
       modifier = Modifier
         .fillMaxSize()
         .padding(innerPadding)
+        .semantics { isTraversalGroup = true; traversalIndex = 0f }
         .verticalScroll(rememberScrollState())
         .padding(horizontal = 16.dp, vertical = 8.dp),
       verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -371,6 +383,7 @@ private fun AddEditFormContent(
 // Top bar
 // ---------------------------------------------------------------------------
 
+@Suppress("LongParameterList")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddEditTopBar(
@@ -379,8 +392,10 @@ private fun AddEditTopBar(
   isSaving: Boolean,
   onClose: () -> Unit,
   onSave: () -> Unit,
+  modifier: Modifier = Modifier,
 ) {
   TopAppBar(
+    modifier = modifier,
     title = {
       Text(
         text = if (isEditMode) {
@@ -613,12 +628,13 @@ private fun ColorSwatch(
   } else {
     stringResource(R.string.add_edit_color_not_selected, colorName)
   }
-  val swatchShape = if (isSelected) RoundedCornerShape(8.dp) else CircleShape
+  val swatchShape = if (isSelected) RoundedCornerShape(12.dp) else CircleShape
 
   // 48dp touch target wrapping 40dp visual swatch (AC-AE-5)
   Box(
     modifier = modifier
       .size(48.dp)
+      .testTag("color_swatch_${color.ordinal}")
       .clickable(
         role = Role.RadioButton,
         onClickLabel = a11yDesc,
@@ -634,12 +650,14 @@ private fun ColorSwatch(
       modifier = Modifier
         .size(40.dp)
         .clip(swatchShape)
-        .background(palette.hero)
+        // Container (pastel) fill per design spec m3-app.jsx:836 — hero was incorrect.
+        .background(palette.container)
         .then(
           if (isSelected) {
+            // Inset selection ring in hero tone (m3-app.jsx:838 inset 0 0 0 3px hero).
             Modifier.border(
-              width = 2.dp,
-              color = MaterialTheme.colorScheme.onSurface,
+              width = 3.dp,
+              color = palette.hero,
               shape = swatchShape,
             )
           } else {
@@ -652,7 +670,8 @@ private fun ColorSwatch(
         Icon(
           imageVector = Icons.Filled.Check,
           contentDescription = null,
-          tint = palette.onHero,
+          // onContainer for contrast on container-filled swatch (was onHero).
+          tint = palette.onContainer,
           modifier = Modifier.size(20.dp),
         )
       }
@@ -664,6 +683,7 @@ private fun ColorSwatch(
 // Icon picker section (AC-AE-6)
 // ---------------------------------------------------------------------------
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun IconPickerSection(
   selected: DomainEventIcon,
@@ -676,29 +696,18 @@ private fun IconPickerSection(
       style = MaterialTheme.typography.labelLarge,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    // 8 columns × 2 rows = 16 icons (AC-AE-6, matches эталон)
-    val icons = DomainEventIcon.entries
-    val columnCount = 8
-    val rowCount = (icons.size + columnCount - 1) / columnCount
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      repeat(rowCount) { row ->
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          repeat(columnCount) { col ->
-            val index = row * columnCount + col
-            if (index < icons.size) {
-              val domainIcon = icons[index]
-              IconPickerCell(
-                domainIcon = domainIcon,
-                isSelected = domainIcon == selected,
-                onClick = { onSelect(domainIcon) },
-                modifier = Modifier.weight(1f),
-              )
-            } else {
-              // Empty placeholder to maintain grid alignment
-              Spacer(modifier = Modifier.weight(1f))
-            }
-          }
-        }
+    // FlowRow wraps icons to new rows automatically — guarantees real 48dp touch targets
+    // on any screen width (8×2 fixed grid exceeded 412dp at 48dp/cell + gaps).
+    FlowRow(
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      DomainEventIcon.entries.forEach { domainIcon ->
+        IconPickerCell(
+          domainIcon = domainIcon,
+          isSelected = domainIcon == selected,
+          onClick = { onSelect(domainIcon) },
+        )
       }
     }
   }

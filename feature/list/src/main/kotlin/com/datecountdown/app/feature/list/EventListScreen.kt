@@ -5,7 +5,7 @@ package com.datecountdown.app.feature.list
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.datecountdown.app.core.design.theme.LocalResolvedDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,10 +33,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -77,6 +79,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -89,6 +92,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.datecountdown.app.core.design.theme.BlobShape
@@ -197,6 +201,9 @@ internal fun EventListScreenContent(
   val contentState = state as? EventListState.Content
   val upcomingCount = contentState?.upcoming?.size ?: 0
   val isGlobalEmpty = contentState?.upcoming?.isEmpty() == true && contentState.past.isEmpty()
+  // AC-LS-14: FAB is suppressed when either empty-state CTA is shown (global or partial),
+  // to avoid two identical "New event" controls competing on screen.
+  val isEmptyStateShown = contentState?.upcoming?.isEmpty() == true
   val subtitle = buildSubtitle(isGlobalEmpty = isGlobalEmpty, upcomingCount = upcomingCount)
 
   if (showSettingsDialog) {
@@ -219,7 +226,7 @@ internal fun EventListScreenContent(
         onSettingsClick = { showSettingsDialog = true },
       )
     },
-    floatingActionButton = { ListFab(onClick = onAddClick) },
+    floatingActionButton = { if (!isEmptyStateShown) ListFab(onClick = onAddClick) },
     snackbarHost = {
       // AC-LS-21: liveRegion = Polite so screen readers announce snackbar content.
       SnackbarHost(
@@ -230,21 +237,41 @@ internal fun EventListScreenContent(
   ) { innerPadding ->
     // Banner is hoisted above the state branch so it renders in Loading / Error states too (AC-NT-12).
     val permissionState = LocalNotificationPermissionState.current
-    Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+    val layoutDirection = LocalLayoutDirection.current
+    // Edge-to-edge inset strategy:
+    //  - Banner (when shown): consumes the top inset itself (app bar height + 8 dp gap). Branches
+    //    rendered below the banner must NOT add top inset again — that would double-count it.
+    //  - Grid: top contentPadding = app bar height + 8 dp (or just 8 dp when banner is shown).
+    //    Cards scroll visually under the app bar (immersive scroll-under).
+    //  - Loading / Error / GlobalEmpty: static, centered content. Use the shared
+    //    staticContentPadding below: top is zeroed when the banner already consumed it, otherwise
+    //    equals innerPadding.top. Start/end/bottom are always forwarded from innerPadding.
+    val staticContentPadding = PaddingValues(
+      start = innerPadding.calculateStartPadding(layoutDirection),
+      top = if (permissionState.shouldShowBanner) 0.dp else innerPadding.calculateTopPadding(),
+      end = innerPadding.calculateEndPadding(layoutDirection),
+      bottom = innerPadding.calculateBottomPadding(),
+    )
+    Column(modifier = Modifier.fillMaxSize()) {
       if (permissionState.shouldShowBanner) {
         NotificationBanner(
           onBannerClick = permissionState.triggerRequest,
-          modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+          modifier = Modifier.padding(
+            start = 16.dp,
+            end = 16.dp,
+            top = innerPadding.calculateTopPadding() + 8.dp,
+            bottom = 8.dp,
+          ),
         )
       }
       when (state) {
         EventListState.Loading -> LoadingContent(
-          modifier = Modifier.weight(weight = 1f),
+          modifier = Modifier.weight(weight = 1f).padding(staticContentPadding),
         )
 
         is EventListState.Error -> ErrorContent(
           message = stringResource(R.string.list_error_message),
-          modifier = Modifier.weight(weight = 1f),
+          modifier = Modifier.weight(weight = 1f).padding(staticContentPadding),
         )
 
         is EventListState.Content -> ContentBody(
@@ -254,6 +281,16 @@ internal fun EventListScreenContent(
           onAddClick = onAddClick,
           onDelete = onDelete,
           onTogglePast = onTogglePast,
+          emptyStatePadding = staticContentPadding,
+          // When the banner is shown, top inset is already consumed by the banner above.
+          gridTopPadding = if (permissionState.shouldShowBanner) {
+            8.dp
+          } else {
+            innerPadding.calculateTopPadding() + 8.dp
+          },
+          gridBottomPadding = innerPadding.calculateBottomPadding() + 96.dp,
+          gridStartPadding = innerPadding.calculateStartPadding(layoutDirection) + 16.dp,
+          gridEndPadding = innerPadding.calculateEndPadding(layoutDirection) + 16.dp,
           modifier = Modifier.weight(weight = 1f),
         )
       }
@@ -343,10 +380,15 @@ private fun ContentBody(
   onAddClick: () -> Unit,
   onDelete: (id: EventId) -> Unit,
   onTogglePast: () -> Unit,
+  emptyStatePadding: PaddingValues,
+  gridTopPadding: Dp,
+  gridBottomPadding: Dp,
+  gridStartPadding: Dp,
+  gridEndPadding: Dp,
   modifier: Modifier = Modifier,
 ) {
   if (isGlobalEmpty) {
-    GlobalEmptyState(onAddClick = onAddClick, modifier = modifier)
+    GlobalEmptyState(onAddClick = onAddClick, modifier = modifier.padding(emptyStatePadding))
   } else {
     EventsGrid(
       upcoming = state.upcoming,
@@ -356,6 +398,10 @@ private fun ContentBody(
       onAddClick = onAddClick,
       onDelete = onDelete,
       onTogglePast = onTogglePast,
+      topPadding = gridTopPadding,
+      bottomPadding = gridBottomPadding,
+      startPadding = gridStartPadding,
+      endPadding = gridEndPadding,
       modifier = modifier,
     )
   }
@@ -363,7 +409,6 @@ private fun ContentBody(
 
 // ── Top App Bar ──────────────────────────────────────────────────────────────────────────────────
 
-@Suppress("LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ListTopBar(
@@ -386,31 +431,18 @@ private fun ListTopBar(
       }
     },
     modifier = modifier,
-    navigationIcon = {
-      // AC-LS-2: menu is disabled in MVP (drawer not yet implemented).
-      // enabled=false provides the correct TalkBack "disabled" announcement and excludes from focus.
-      IconButton(
-        onClick = { /* no-op: drawer is out of MVP scope */ },
-        enabled = false,
-      ) {
-        Icon(
-          imageVector = Icons.Filled.Menu,
-          contentDescription = stringResource(R.string.list_menu_description),
-        )
-      }
-    },
+    // Edge-to-edge (AC-TH-6): surface background in all scroll phases so the title is legible
+    // over scrolled card content at every point of the collapse transition. The transparent
+    // background caused a contrast dip in dark theme when the bar was partially collapsed over
+    // light-toned cards (amber / teal). Variant A (opaque surface) is used in preference to a
+    // gradient scrim: it is a single-line change, fully guaranteed in all themes and fontScales,
+    // and AC-TH-6 only requires "edge-to-edge / content scrolls under the bar" — not transparency.
+    // Scroll-under still works: content draws behind an opaque surface-color bar on scroll.
+    colors = TopAppBarDefaults.largeTopAppBarColors(
+      containerColor = MaterialTheme.colorScheme.surface,
+      scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+    ),
     actions = {
-      // AC-LS-2: search is disabled in MVP.
-      IconButton(
-        onClick = { /* no-op: search is out of MVP scope */ },
-        enabled = false,
-      ) {
-        Icon(
-          imageVector = Icons.Filled.Search,
-          contentDescription = stringResource(R.string.list_search_description),
-        )
-      }
-
       // AC-LS-2 / AC-LS-19: more_vert is active — opens the settings menu.
       Box {
         IconButton(onClick = { menuExpanded = true }) {
@@ -455,6 +487,10 @@ private fun ListTopBar(
  * Horizontal row of filter chips. In MVP all chips are visual-only: "All" is always selected,
  * tapping any chip is a no-op. Functional filtering is tracked in issue #09 (post-MVP).
  *
+ * The "All" chip always shows a [Icons.Filled.Done] leading icon — M3 FilterChip does NOT
+ * render a checkmark automatically; the icon provides the required non-color selection signal
+ * (a11y rule 2). TalkBack announces "selected" via the chip's built-in selectable semantics.
+ *
  * AC-LS-3, AC-LS-22.
  */
 @Composable
@@ -463,11 +499,22 @@ private fun FilterChipsRow(modifier: Modifier = Modifier) {
     modifier = modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
     horizontalArrangement = Arrangement.spacedBy(8.dp),
   ) {
-    // "All" — always selected. The check-mark is rendered by FilterChip (visual only in MVP).
+    // "All" — always selected. Leading Done icon is the non-color selection signal (a11y rule 2).
+    // M3 FilterChip does not draw a checkmark automatically — the icon must be explicit.
     FilterChip(
       selected = true,
       onClick = { /* no-op: filtering is post-MVP */ },
       label = { Text(stringResource(R.string.list_filter_all)) },
+      leadingIcon = {
+        Icon(
+          imageVector = Icons.Filled.Done,
+          // Decorative — the chip's selectable semantics carry the "selected" state for TalkBack.
+          contentDescription = null,
+          modifier = Modifier
+            .size(FilterChipDefaults.IconSize)
+            .testTag("all_chip_checkmark"),
+        )
+      },
     )
     FilterChip(
       selected = false,
@@ -573,16 +620,23 @@ private fun EventsGrid(
   onAddClick: () -> Unit,
   onDelete: (id: EventId) -> Unit,
   onTogglePast: () -> Unit,
+  // Edge-to-edge: padding is passed from the parent so the grid scrolls under the transparent
+  // top app bar. topPadding already includes the app bar height so the first card is visually
+  // below the bar and scrolls underneath it.
+  topPadding: Dp = 8.dp,
+  bottomPadding: Dp = 96.dp,
+  startPadding: Dp = 16.dp,
+  endPadding: Dp = 16.dp,
   modifier: Modifier = Modifier,
 ) {
   LazyVerticalGrid(
     columns = GridCells.Fixed(count = 2),
     modifier = modifier,
     contentPadding = PaddingValues(
-      start = 16.dp,
-      end = 16.dp,
-      top = 8.dp,
-      bottom = 96.dp, // reserve space for the FAB
+      start = startPadding,
+      end = endPadding,
+      top = topPadding,
+      bottom = bottomPadding,
     ),
     verticalArrangement = Arrangement.spacedBy(12.dp),
     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -724,7 +778,8 @@ private fun SwipeDeleteBackground(modifier: Modifier = Modifier) {
       .fillMaxSize()
       .background(
         color = MaterialTheme.colorScheme.errorContainer,
-        shape = MaterialTheme.shapes.medium,
+        // Match EventCardShape (28.dp) so background corners don't bleed past the card outline.
+        shape = EventCardShape,
       ),
     contentAlignment = Alignment.CenterEnd,
   ) {
@@ -825,7 +880,7 @@ private fun GlobalEmptyState(
   ) {
     val tealPalette = eventPaletteByIndex(
       index = EventPaletteId.TEAL.ordinal,
-      dark = isSystemInDarkTheme(),
+      dark = LocalResolvedDarkTheme.current,
     )
     Box(
       contentAlignment = Alignment.Center,
@@ -941,7 +996,7 @@ private fun ListFab(
       )
     },
     onClick = onClick,
-    modifier = modifier,
+    modifier = modifier.testTag("list_fab"),
   )
 }
 
