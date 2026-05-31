@@ -729,9 +729,7 @@ private fun CounterDateChip(
   AssistChip(
     onClick = {},  // no-op: visual chip only — clearAndSetSemantics neutralises the click role
     label = { Text(text = formattedDate, style = MaterialTheme.typography.bodySmall) },
-    modifier = modifier.semantics(mergeDescendants = false) {
-      contentDescription = formattedDate
-    },
+    modifier = modifier.clearAndSetSemantics { contentDescription = formattedDate },
     colors = AssistChipDefaults.assistChipColors(
       containerColor = containerColor,
       labelColor = labelColor,
