@@ -10,6 +10,7 @@ import com.datecountdown.app.core.design.theme.LocalResolvedDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +21,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
@@ -65,11 +68,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.datecountdown.app.core.common.R as CommonR
 import com.datecountdown.app.core.design.theme.BlobShape
+import com.datecountdown.app.core.design.theme.ContentSize
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
 import com.datecountdown.app.core.design.theme.GLASS_ALPHA_DEFAULT
 import com.datecountdown.app.core.design.theme.GLASS_ALPHA_LEGACY
@@ -313,36 +319,58 @@ private fun UpcomingCounter(
       },
       containerColor = Color.Transparent,
     ) { innerPadding ->
-      Column(
+      // #187/#189/#190: BoxWithConstraints spans the full Scaffold body so maxWidth reflects
+      // actual window width (before the column cap is applied). This is the measuring point
+      // for the adaptive font derivation (#190) — measuring inside the 520dp column would
+      // make the font scale never fire (520 < 600 threshold on all screens).
+      BoxWithConstraints(
         modifier = Modifier
           .fillMaxSize()
-          .padding(innerPadding)
-          .padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+          .padding(innerPadding),
       ) {
-        Spacer(modifier = Modifier.height(8.dp))
+        // #190: adaptive primaryValueMaxFontSize.
+        // At ≤600dp (phones): cap = 96sp (unchanged). Above 600dp: linearly ramp to 160sp
+        // at 1280dp. Derived from usable content width, not the device diagonal.
+        // Values at key breakpoints: 360dp→96sp, 600dp→96sp, 800dp→≈115sp, 1280dp→160sp.
+        val upcomingMaxFontSize = adaptivePrimaryMaxFontSize(maxWidth)
 
-        CounterHeader(
-          event = event,
-          headerLabel = stringResource(R.string.counter_label_until),
-          palette = palette,
-          onHeroColor = palette.onHero,
-          isDark = isDark,
-        )
+        Column(
+          modifier = Modifier
+            .fillMaxSize()
+            // #187: center the content column horizontally; phone widths (<520dp) pass through
+            // unchanged — wrapContentWidth + widthIn(max=520) is a no-op when available width
+            // is already ≤520dp.
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .widthIn(max = ContentSize.CounterColumnMax)
+            .padding(horizontal = 24.dp),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          // #189: CenterVertically distributes free space above and below the content cluster.
+          // On phone the content nearly fills the height so the shift is minimal. The trailing
+          // Spacer(weight(1f)) that pinned content to the top is removed.
+          verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
+        ) {
+          Spacer(modifier = Modifier.height(8.dp))
 
-        CounterPrimary(
-          countdown = countdown,
-          onHeroColor = palette.onHero,
-        )
+          CounterHeader(
+            event = event,
+            headerLabel = stringResource(R.string.counter_label_until),
+            palette = palette,
+            onHeroColor = palette.onHero,
+            isDark = isDark,
+          )
 
-        GlassRow(
-          countdown = countdown,
-          scrimColor = scrimColor,
-          onHeroColor = palette.onHero,
-        )
+          CounterPrimary(
+            countdown = countdown,
+            onHeroColor = palette.onHero,
+            maxAutoSizeFontSize = upcomingMaxFontSize,
+          )
 
-        Spacer(modifier = Modifier.weight(1f))
+          GlassRow(
+            countdown = countdown,
+            scrimColor = scrimColor,
+            onHeroColor = palette.onHero,
+          )
+        }
       }
     }
   }
@@ -419,38 +447,72 @@ private fun PastCounter(
       },
       containerColor = Color.Transparent,
     ) { innerPadding ->
-      Column(
+      // #187/#189/#190: BoxWithConstraints spans the full Scaffold body so maxWidth reflects
+      // actual window width (before the column cap). Same rationale as UpcomingCounter.
+      BoxWithConstraints(
         modifier = Modifier
           .fillMaxSize()
           .padding(innerPadding),
-        horizontalAlignment = Alignment.CenterHorizontally,
       ) {
-        Spacer(modifier = Modifier.height(8.dp))
+        // #190: same adaptive font derivation as UpcomingCounter.
+        val pastMaxFontSize = adaptivePrimaryMaxFontSize(maxWidth)
 
-        // Header: muted blob icon + past-event chip + title + date
         Column(
           modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp),
+            .fillMaxSize()
+            // #187: cap + center content column; no-op on phone widths (<520dp).
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .widthIn(max = ContentSize.CounterColumnMax),
           horizontalAlignment = Alignment.CenterHorizontally,
-          verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-          // AC-PE-6: priглушённая blob-иконка — surfaceContainerHigh bg, onSurfaceVariant tint.
-          Box(
+          // #189: symmetric spacer pair around the upper cluster so it centers vertically.
+          // The button row stays at the bottom (it follows the trailing weight(1f) spacer).
+          // CenterVertically on the outer Column is NOT used because it would displace the buttons.
+          Spacer(modifier = Modifier.weight(1f))
+
+          Spacer(modifier = Modifier.height(8.dp))
+
+          // Header: muted blob icon + past-event chip + title + date
+          Column(
             modifier = Modifier
-              .size(72.dp)
-              .clip(BlobShape.Variant4)
-              .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            contentAlignment = Alignment.Center,
+              .fillMaxWidth()
+              .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
           ) {
-            EventSymbol(
-              icon = designIcon,
-              size = 36.sp,
-              tint = MaterialTheme.colorScheme.onSurfaceVariant,
-              contentDescription = stringResource(
-                R.string.counter_icon_description,
-                stringResource(designIcon.labelRes),
-              ),
+            // AC-PE-6: приглушённая blob-иконка — surfaceContainerHigh bg, onSurfaceVariant tint.
+            Box(
+              modifier = Modifier
+                .size(72.dp)
+                .clip(BlobShape.Variant4)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+              contentAlignment = Alignment.Center,
+            ) {
+              EventSymbol(
+                icon = designIcon,
+                size = 36.sp,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                contentDescription = stringResource(
+                  R.string.counter_icon_description,
+                  stringResource(designIcon.labelRes),
+                ),
+              )
+            }
+
+            // #192: cap title line length; no-op inside the 520dp column on phone.
+            Text(
+              text = event.title,
+              style = MaterialTheme.typography.headlineMedium,
+              color = MaterialTheme.colorScheme.onSurface,
+              maxLines = 2,
+              overflow = TextOverflow.Ellipsis,
+              modifier = Modifier.widthIn(max = ContentSize.ReadableTextMax),
+            )
+
+            Text(
+              text = formattedDate,
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
           }
 
@@ -470,78 +532,68 @@ private fun PastCounter(
             ),
           )
 
-          Text(
-            text = event.title,
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+          Spacer(modifier = Modifier.height(32.dp))
+
+          // AC-PE-8: large primary number with autosize.
+          PastPrimary(
+            breakdown = breakdown,
+            onSurfaceColor = MaterialTheme.colorScheme.onSurface,
+            maxAutoSizeFontSize = pastMaxFontSize,
+            modifier = Modifier.padding(horizontal = 24.dp),
           )
 
-          Text(
-            text = formattedDate,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
+          Spacer(modifier = Modifier.weight(1f))
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // AC-PE-8: large primary number with autosize.
-        PastPrimary(
-          breakdown = breakdown,
-          onSurfaceColor = MaterialTheme.colorScheme.onSurface,
-          modifier = Modifier.padding(horizontal = 24.dp),
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // AC-PE-9: Reschedule + Delete buttons.
-        Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(bottom = 24.dp),
-          horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-          val rescheduleDesc = stringResource(R.string.counter_a11y_reschedule)
-          FilledTonalButton(
-            onClick = onRescheduleClick,
+          // AC-PE-9: Reschedule + Delete buttons.
+          // #188: cap the button row at ButtonMax and center it so buttons do not stretch to half
+          // of a wide screen. On phone (ButtonMax=360dp, row≈330dp after padding) this is a no-op.
+          Row(
             modifier = Modifier
-              .weight(1f)
-              .semantics { contentDescription = rescheduleDesc },
-            colors = ButtonDefaults.filledTonalButtonColors(
-              containerColor = MaterialTheme.colorScheme.secondaryContainer,
-              contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ),
+              .wrapContentWidth(Alignment.CenterHorizontally)
+              .widthIn(max = ContentSize.ButtonMax)
+              .padding(horizontal = 16.dp)
+              .padding(bottom = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
           ) {
-            Icon(
-              imageVector = Icons.Filled.Refresh,
-              contentDescription = null,  // decorative — button contentDescription covers semantics
-              modifier = Modifier.size(18.dp),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.counter_reschedule_button))
-          }
+            val rescheduleDesc = stringResource(R.string.counter_a11y_reschedule)
+            FilledTonalButton(
+              onClick = onRescheduleClick,
+              modifier = Modifier
+                .weight(1f)
+                .semantics { contentDescription = rescheduleDesc },
+              colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+              ),
+            ) {
+              Icon(
+                imageVector = Icons.Filled.Refresh,
+                contentDescription = null,  // decorative — button contentDescription covers semantics
+                modifier = Modifier.size(18.dp),
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Text(stringResource(R.string.counter_reschedule_button))
+            }
 
-          val deleteDesc = stringResource(R.string.counter_a11y_delete)
-          Button(
-            onClick = onDeleteClick,
-            modifier = Modifier
-              .weight(1f)
-              .semantics { contentDescription = deleteDesc },
-            colors = ButtonDefaults.buttonColors(
-              containerColor = MaterialTheme.colorScheme.errorContainer,
-              contentColor = MaterialTheme.colorScheme.onErrorContainer,
-            ),
-          ) {
-            Icon(
-              imageVector = Icons.Filled.Delete,
-              contentDescription = null,  // decorative — button contentDescription covers semantics
-              modifier = Modifier.size(18.dp),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.counter_delete_button))
+            val deleteDesc = stringResource(R.string.counter_a11y_delete)
+            Button(
+              onClick = onDeleteClick,
+              modifier = Modifier
+                .weight(1f)
+                .semantics { contentDescription = deleteDesc },
+              colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+              ),
+            ) {
+              Icon(
+                imageVector = Icons.Filled.Delete,
+                contentDescription = null,  // decorative — button contentDescription covers semantics
+                modifier = Modifier.size(18.dp),
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Text(stringResource(R.string.counter_delete_button))
+            }
           }
         }
       }
@@ -678,6 +730,9 @@ private fun CounterHeader(
       letterSpacing = 2.sp,
     )
 
+    // #192: cap title line length so it does not run full-width on tablets.
+    // ReadableTextMax (600dp) > CounterColumnMax (520dp) so inside the capped column this
+    // is effectively a no-op; it becomes visible if CounterColumnMax is ever raised.
     Text(
       text = event.title,
       style = MaterialTheme.typography.headlineSmall,
@@ -685,6 +740,7 @@ private fun CounterHeader(
       fontWeight = FontWeight.SemiBold,
       maxLines = 2,
       overflow = TextOverflow.Ellipsis,
+      modifier = Modifier.widthIn(max = ContentSize.ReadableTextMax),
     )
 
     // AC-CL-18: date-chip contrast is theme-dependent.
@@ -745,16 +801,47 @@ private fun CounterDateChip(
 // autoSize then shrinks the font until the text fits rather than wrapping to a second line.
 // 24sp floor: extends coverage to higher fontScale (1.5–2.0) and wider device widths,
 // preventing clipping of values like "245 дней". At fontScale 1.0, autoSize still chooses
-// the maximum font (up to 96sp), so readability is unaffected.
+// the maximum font (up to the adaptive cap), so readability is unaffected.
 private val primaryValueMinFontSize = 24.sp
+
+// Base cap used at phone widths (≤600dp). The effective max is raised adaptively on larger
+// screens via adaptivePrimaryMaxFontSize — see #190.
 private val primaryValueMaxFontSize = 96.sp
+
+// Upper ceiling for the adaptive hero-number cap on very wide screens (≥1280dp).
+private val primaryValueMaxFontSizeLarge = 160.sp
+
+/**
+ * #190: derives the adaptive primary-value max font size from the available content width.
+ *
+ * Formula: linearly ramp from 96sp at ≤600dp to 160sp at ≥1280dp.
+ *   fraction = ((width - 600) / (1280 - 600)).coerceIn(0, 1)
+ *   cap = 96 + 64 * fraction (in sp)
+ *
+ * Key values:
+ *   360dp → 96sp (phone portrait, no change)
+ *   600dp → 96sp (threshold, ramp starts here)
+ *   800dp → ≈115sp
+ *   1280dp → 160sp
+ *
+ * The width argument is the full BoxWithConstraints.maxWidth, measured BEFORE the
+ * CounterColumnMax (520dp) cap is applied, so the ramp fires correctly on wide windows.
+ * The 24sp floor (primaryValueMinFontSize) is unaffected.
+ */
+private fun adaptivePrimaryMaxFontSize(maxWidth: Dp): TextUnit {
+  val fraction = ((maxWidth.value - 600f) / (1280f - 600f)).coerceIn(0f, 1f)
+  val baseSp = primaryValueMaxFontSize.value
+  val rangeSp = primaryValueMaxFontSizeLarge.value - baseSp
+  return (baseSp + rangeSp * fraction).sp
+}
 
 /**
  * Primary countdown number block.
  *
  * AC-CL-4: primary=YEARS shows years (large) + days (smaller) in a column.
  * AC-CL-5/6: all other primaries show one large number with pluralised label below.
- * AC-CL-15: BasicText + TextAutoSize.StepBased clamps the primary number between 32sp and 96sp.
+ * AC-CL-15: BasicText + TextAutoSize.StepBased clamps the primary number between 24sp floor
+ *   and an adaptive max (96sp on phone, up to 160sp on large screens — see adaptivePrimaryMaxFontSize).
  *   maxLines=1 and softWrap=false prevent wrapping so autoSize is forced to shrink the font
  *   rather than accepting a two-line layout.
  * AC-CL-19: the whole block is wrapped with [semantics(mergeDescendants=true)] and a
@@ -765,6 +852,9 @@ private val primaryValueMaxFontSize = 96.sp
 private fun CounterPrimary(
   countdown: CountdownResult.Upcoming,
   onHeroColor: Color,
+  // #190: adaptive ceiling derived from BoxWithConstraints.maxWidth by the caller.
+  // 24sp floor is kept; only the max scales up on wide screens.
+  maxAutoSizeFontSize: TextUnit = primaryValueMaxFontSize,
   modifier: Modifier = Modifier,
 ) {
   // Build the accessibility phrase before the composable tree (AC-CL-19).
@@ -787,8 +877,9 @@ private fun CounterPrimary(
             count = countdown.years,
             countdown.years,
           )
-          // AC-CL-15: autosize clamps displayLarge between 32sp..96sp; maxLines=1 + softWrap=false
-          // prevent wrapping so autoSize shrinks font rather than accepting a 2-line layout.
+          // AC-CL-15: autosize clamps displayLarge between 24sp floor and adaptive max;
+          // maxLines=1 + softWrap=false prevent wrapping so autoSize shrinks font rather than
+          // accepting a 2-line layout.
           BasicText(
             text = yearsLabel,
             style = MaterialTheme.typography.displayLarge.copy(
@@ -799,7 +890,7 @@ private fun CounterPrimary(
             softWrap = false,
             autoSize = TextAutoSize.StepBased(
               minFontSize = primaryValueMinFontSize,
-              maxFontSize = primaryValueMaxFontSize,
+              maxFontSize = maxAutoSizeFontSize,
             ),
           )
           val daysLabel = pluralStringResource(
@@ -821,7 +912,7 @@ private fun CounterPrimary(
           count = countdown.days,
           countdown.days,
         )
-        // AC-CL-15: see primaryValueMinFontSize / primaryValueMaxFontSize comment.
+        // AC-CL-15: see primaryValueMinFontSize / adaptivePrimaryMaxFontSize.
         BasicText(
           text = label,
           style = MaterialTheme.typography.displayLarge.copy(
@@ -832,7 +923,7 @@ private fun CounterPrimary(
           softWrap = false,
           autoSize = TextAutoSize.StepBased(
             minFontSize = primaryValueMinFontSize,
-            maxFontSize = primaryValueMaxFontSize,
+            maxFontSize = maxAutoSizeFontSize,
           ),
         )
       }
@@ -853,7 +944,7 @@ private fun CounterPrimary(
           softWrap = false,
           autoSize = TextAutoSize.StepBased(
             minFontSize = primaryValueMinFontSize,
-            maxFontSize = primaryValueMaxFontSize,
+            maxFontSize = maxAutoSizeFontSize,
           ),
         )
       }
@@ -874,7 +965,7 @@ private fun CounterPrimary(
           softWrap = false,
           autoSize = TextAutoSize.StepBased(
             minFontSize = primaryValueMinFontSize,
-            maxFontSize = primaryValueMaxFontSize,
+            maxFontSize = maxAutoSizeFontSize,
           ),
         )
       }
@@ -895,7 +986,7 @@ private fun CounterPrimary(
           softWrap = false,
           autoSize = TextAutoSize.StepBased(
             minFontSize = primaryValueMinFontSize,
-            maxFontSize = primaryValueMaxFontSize,
+            maxFontSize = maxAutoSizeFontSize,
           ),
         )
       }
@@ -909,14 +1000,16 @@ private fun CounterPrimary(
  * AC-PE-8: large −N (or "Сегодня" when DaysAgo == 0 is expressed as Today) with autosize,
  * secondary "N дней назад" label below for DaysAgo case.
  * AC-PE-11: Today → large "Сегодня" only; no secondary label.
- * AC-PE-16: BasicText + TextAutoSize.StepBased (32sp..96sp) with maxLines=1 + softWrap=false
- *   prevents overflow and forces single-line layout at all fontScale values.
+ * AC-PE-16: BasicText + TextAutoSize.StepBased (24sp floor, 96–160sp adaptive max) with
+ *   maxLines=1 + softWrap=false prevents overflow and forces single-line layout at all fontScale values.
  * AC-PE-17: semantics mergeDescendants so TalkBack reads the whole block as one unit.
  */
 @Composable
 private fun PastPrimary(
   breakdown: PastBreakdown,
   onSurfaceColor: Color,
+  // #190: adaptive ceiling derived from BoxWithConstraints.maxWidth by the caller.
+  maxAutoSizeFontSize: TextUnit = primaryValueMaxFontSize,
   modifier: Modifier = Modifier,
 ) {
   val a11yDescription = buildPastA11yDescription(breakdown)
@@ -930,6 +1023,7 @@ private fun PastPrimary(
     when (breakdown) {
       PastBreakdown.Today -> {
         // AC-PE-11: event happened today — show "Сегодня", no number, no secondary label.
+        // AC-PE-16: 24sp floor, adaptive max (96sp on phone, up to 160sp on large screens).
         BasicText(
           text = stringResource(R.string.counter_past_today),
           style = MaterialTheme.typography.displayLarge.copy(
@@ -940,7 +1034,7 @@ private fun PastPrimary(
           softWrap = false,
           autoSize = TextAutoSize.StepBased(
             minFontSize = primaryValueMinFontSize,
-            maxFontSize = primaryValueMaxFontSize,
+            maxFontSize = maxAutoSizeFontSize,
           ),
         )
       }
@@ -951,6 +1045,7 @@ private fun PastPrimary(
           verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
           // AC-PE-8: large "−N" number.
+          // AC-PE-16: 24sp floor, adaptive max.
           BasicText(
             text = "−${breakdown.days}",
             style = MaterialTheme.typography.displayLarge.copy(
@@ -961,7 +1056,7 @@ private fun PastPrimary(
             softWrap = false,
             autoSize = TextAutoSize.StepBased(
               minFontSize = primaryValueMinFontSize,
-              maxFontSize = primaryValueMaxFontSize,
+              maxFontSize = maxAutoSizeFontSize,
             ),
           )
           // AC-PE-8: secondary "N дней назад" label.
