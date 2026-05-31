@@ -1,5 +1,10 @@
 package com.datecountdown.app.feature.counter
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -95,6 +100,53 @@ internal class CounterScreenTest {
     // PastBreakdown.DaysAgo(14) — rendered as "−14" (minus sign + number).
     // The block uses mergeDescendants=true; use useUnmergedTree to find the inner text node.
     composeRule.onNodeWithText("−14", useUnmergedTree = true).assertIsDisplayed()
+  }
+
+  // ── Past chip a11y (AC-PE-17) ─────────────────────────────────────────────────────────────────
+
+  @Test
+  fun `past chip - contentDescription is PAST EVENT label`() {
+    // clearAndSetSemantics exposes only our contentDescription; the chip node is
+    // findable by that description rather than by its text child.
+    composeRule.setContent {
+      DateCountdownTheme {
+        CounterScreen(component = FakeCounterComponent(state = pastState()))
+      }
+    }
+
+    composeRule.onNodeWithContentDescription("PAST EVENT").assertExists()
+  }
+
+  @Test
+  fun `past chip - does not have OnClick action (AC-PE-17)`() {
+    // clearAndSetSemantics strips the AssistChip's built-in OnClick action so
+    // TalkBack does not announce the chip as an actionable button.
+    composeRule.setContent {
+      DateCountdownTheme {
+        CounterScreen(component = FakeCounterComponent(state = pastState()))
+      }
+    }
+
+    val hasOnClick = SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick)
+    composeRule
+      .onNodeWithContentDescription("PAST EVENT")
+      .assert(hasOnClick.not())
+  }
+
+  @Test
+  fun `past chip - does not have Button role (AC-PE-17)`() {
+    // clearAndSetSemantics strips Role.Button so the chip is not announced as a
+    // button by screen readers.
+    composeRule.setContent {
+      DateCountdownTheme {
+        CounterScreen(component = FakeCounterComponent(state = pastState()))
+      }
+    }
+
+    val hasButtonRole = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
+    composeRule
+      .onNodeWithContentDescription("PAST EVENT")
+      .assert(hasButtonRole.not())
   }
 
   // ── NotFound ───────────────────────────────────────────────────────────────────────────────────
