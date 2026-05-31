@@ -1,5 +1,9 @@
 package com.datecountdown.app.feature.counter
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -128,6 +132,26 @@ internal class CounterScreenTest {
     // Regression guard: snake_case must not reach TalkBack.
     composeRule.onNodeWithContentDescription("music_note icon", useUnmergedTree = true)
       .assertDoesNotExist()
+  }
+
+  // ── Date chip a11y (AC-CL-17 / AC-CL-19) ─────────────────────────────────────────────────────
+
+  @Test
+  fun `date chip - exposes contentDescription and no button role or click action`() {
+    // testEvent.targetDateTime = 2027-06-15T10:00:00Z — "2027" is unique in the tree.
+    // clearAndSetSemantics wipes AssistChip's internal button role and onClick action,
+    // leaving only contentDescription. Regression: .semantics(mergeDescendants=false) did NOT
+    // clear the click role, making TalkBack announce the chip as an interactive button.
+    composeRule.setContent {
+      DateCountdownTheme {
+        CounterScreen(component = FakeCounterComponent(state = upcomingState()))
+      }
+    }
+
+    val dateChip = composeRule.onNodeWithContentDescription("2027", substring = true)
+    dateChip.assertExists()
+    dateChip.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+    dateChip.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
   }
 
   // ── Interactions ───────────────────────────────────────────────────────────────────────────────

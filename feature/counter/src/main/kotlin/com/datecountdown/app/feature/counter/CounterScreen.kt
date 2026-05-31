@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -723,9 +724,7 @@ private fun CounterDateChip(
   AssistChip(
     onClick = {},  // no-op: visual chip only — clearAndSetSemantics neutralises the click role
     label = { Text(text = formattedDate, style = MaterialTheme.typography.bodySmall) },
-    modifier = modifier.semantics(mergeDescendants = false) {
-      contentDescription = formattedDate
-    },
+    modifier = modifier.clearAndSetSemantics { contentDescription = formattedDate },
     colors = AssistChipDefaults.assistChipColors(
       containerColor = containerColor,
       labelColor = labelColor,
