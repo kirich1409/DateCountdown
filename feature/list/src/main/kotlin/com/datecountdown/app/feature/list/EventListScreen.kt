@@ -31,10 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -363,7 +361,6 @@ private fun ContentBody(
 
 // ── Top App Bar ──────────────────────────────────────────────────────────────────────────────────
 
-@Suppress("LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ListTopBar(
@@ -386,31 +383,7 @@ private fun ListTopBar(
       }
     },
     modifier = modifier,
-    navigationIcon = {
-      // AC-LS-2: menu is disabled in MVP (drawer not yet implemented).
-      // enabled=false provides the correct TalkBack "disabled" announcement and excludes from focus.
-      IconButton(
-        onClick = { /* no-op: drawer is out of MVP scope */ },
-        enabled = false,
-      ) {
-        Icon(
-          imageVector = Icons.Filled.Menu,
-          contentDescription = stringResource(R.string.list_menu_description),
-        )
-      }
-    },
     actions = {
-      // AC-LS-2: search is disabled in MVP.
-      IconButton(
-        onClick = { /* no-op: search is out of MVP scope */ },
-        enabled = false,
-      ) {
-        Icon(
-          imageVector = Icons.Filled.Search,
-          contentDescription = stringResource(R.string.list_search_description),
-        )
-      }
-
       // AC-LS-2 / AC-LS-19: more_vert is active — opens the settings menu.
       Box {
         IconButton(onClick = { menuExpanded = true }) {

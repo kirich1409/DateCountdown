@@ -2,9 +2,7 @@
 <resources>
   <!-- Top App Bar -->
   <string name="list_title">Countdown</string>
-  <string name="list_menu_description">Menu</string>
-  <string name="list_search_description">Search</string>
-  <string name="list_more_description">More</string>
+<string name="list_more_description">More</string>
 
   <!-- Subtitle plurals: "N events ahead" / "Пока ничего не запланировано" -->
   <plurals name="list_subtitle_events_ahead">
