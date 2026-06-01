@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -92,10 +94,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.datecountdown.app.core.design.theme.BlobShape
+import com.datecountdown.app.core.design.theme.ContentSize
 import com.datecountdown.app.core.design.theme.DateCountdownTheme
 import com.datecountdown.app.core.design.theme.LocalNotificationPermissionState
 import com.datecountdown.app.core.design.theme.EventPaletteId
@@ -603,6 +607,31 @@ private fun NotificationBanner(
 // ── Events grid ──────────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Custom [GridCells] that derives the column count from the available cross-axis width and a
+ * target card width, with a minimum of 2 columns.
+ *
+ * Formula: `count = max(2, (availableSize + spacing) / (target.roundToPx() + spacing))`
+ *
+ * The distribution of remaining pixels mirrors [GridCells.Fixed]: the first `remainder` cells
+ * each receive one extra pixel so all content width is consumed evenly.
+ *
+ * equals/hashCode are based on [target] so Compose can correctly skip recomposition
+ * when the instance is stable (mirrors the pattern used by [GridCells.Adaptive] and [GridCells.Fixed]).
+ */
+@Suppress("MagicNumber")
+private data class AdaptiveGridColumns(
+  private val target: Dp,
+) : GridCells {
+  override fun Density.calculateCrossAxisCellSizes(availableSize: Int, spacing: Int): List<Int> {
+    val count = maxOf(2, (availableSize + spacing) / (target.roundToPx() + spacing))
+    val sizeWithoutSpacing = availableSize - spacing * (count - 1)
+    val cellSize = sizeWithoutSpacing / count
+    val remainder = sizeWithoutSpacing % count
+    return List(count) { index -> cellSize + if (index < remainder) 1 else 0 }
+  }
+}
+
+/**
  * 2-column lazy grid containing:
  *  - filter chips row (full-width span)
  *  - upcoming cards (or [PartialEmptyState] when upcoming is empty but past is non-empty)
@@ -630,8 +659,11 @@ private fun EventsGrid(
   modifier: Modifier = Modifier,
 ) {
   LazyVerticalGrid(
-    columns = GridCells.Fixed(count = 2),
-    modifier = modifier,
+    columns = AdaptiveGridColumns(target = ContentSize.GridCardTarget),
+    modifier = modifier
+      .fillMaxWidth()
+      .wrapContentWidth(Alignment.CenterHorizontally)
+      .widthIn(max = ContentSize.GridContainerMax),
     contentPadding = PaddingValues(
       start = startPadding,
       end = endPadding,
@@ -837,7 +869,9 @@ private fun PastSectionHeader(
       text = stringResource(R.string.list_past_section_title, count),
       style = MaterialTheme.typography.titleSmall,
       color = MaterialTheme.colorScheme.onSurface,
-      modifier = Modifier.weight(weight = 1f),
+      modifier = Modifier
+        .weight(weight = 1f)
+        .widthIn(max = ContentSize.ReadableTextMax),
     )
     val label = if (collapsed) {
       stringResource(R.string.list_past_expand)
@@ -874,7 +908,11 @@ private fun GlobalEmptyState(
   modifier: Modifier = Modifier,
 ) {
   Column(
-    modifier = modifier.padding(horizontal = 32.dp),
+    modifier = modifier
+      .fillMaxWidth()
+      .wrapContentWidth(Alignment.CenterHorizontally)
+      .widthIn(max = ContentSize.ReadableTextMax)
+      .padding(horizontal = 32.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.Center,
   ) {
@@ -918,7 +956,7 @@ private fun GlobalEmptyState(
 
     Spacer(modifier = Modifier.height(32.dp))
 
-    Button(onClick = onAddClick, modifier = Modifier.fillMaxWidth()) {
+    Button(onClick = onAddClick, modifier = Modifier.widthIn(max = ContentSize.ButtonMax)) {
       Text(stringResource(R.string.list_fab_label))
     }
   }
@@ -952,7 +990,10 @@ private fun PartialEmptyState(
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    OutlinedButton(onClick = onAddClick) {
+    OutlinedButton(
+      onClick = onAddClick,
+      modifier = Modifier.widthIn(max = ContentSize.ButtonMax),
+    ) {
       Text(stringResource(R.string.list_fab_label))
     }
   }

@@ -45,6 +45,7 @@ import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.stack.animation.slide
 import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
+import com.datecountdown.app.core.design.theme.ContentSize
 import com.datecountdown.app.core.design.theme.LocalNotificationPermissionState
 import com.datecountdown.app.core.design.theme.NotificationPermissionState
 import com.datecountdown.app.domain.SettingsRepository
@@ -201,6 +202,7 @@ internal fun RootContent(
           editChild.component.onDismissRequest()
         },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetMaxWidth = ContentSize.ReadableTextMax,
         // Decorative pill — no accessibility node (TalkBack must not announce it).
         // M3 default DragHandle announces itself as "drag handle", which is noise for a
         // decorative element.
