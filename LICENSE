@@ -1,0 +1,36 @@
+DateCountdown — Source-Available License
+Copyright (c) 2026 Kirill Rozov. All Rights Reserved.
+
+The source code in this repository (the "Software") is made publicly
+available for the sole purpose of viewing, reading, and reference.
+
+Permission is NOT granted to any person to use, copy, reproduce, modify,
+adapt, translate, merge, publish, distribute, sublicense, sell, or create
+derivative works of the Software, in whole or in part, for any purpose,
+whether commercial or non-commercial, except as expressly stated below.
+
+You MAY:
+  - View and read the source code within this repository.
+  - Fork the repository within GitHub solely as permitted by the GitHub
+    Terms of Service. Such a fork grants you no rights under this License
+    beyond viewing; all restrictions above continue to apply to the
+    forked copy.
+
+You MAY NOT:
+  - Run, build, or deploy the Software or any part of it.
+  - Copy or reproduce the Software outside the GitHub viewing/forking
+    mechanism described above.
+  - Modify the Software or create derivative works.
+  - Distribute, publish, or sublicense the Software.
+  - Use the Software, or any code, design, or asset within it, in any
+    other project, product, or service.
+
+All rights not expressly granted are reserved by the copyright holder.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
+OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
