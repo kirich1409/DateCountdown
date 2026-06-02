@@ -49,7 +49,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -276,17 +276,29 @@ private fun UpcomingCounter(
   // them. Only icon appearance (light vs dark) is controlled here — bars themselves are not colored.
   val view = LocalView.current
   if (!view.isInEditMode) {
-    // LaunchedEffect(palette.hero) instead of SideEffect: hero changes only on color change, not
-    // every tick. SideEffect ran JNI window calls on every recomposition (1 Hz); LaunchedEffect
-    // defers to the coroutine dispatcher and only restarts when the hero color actually changes.
-    LaunchedEffect(palette.hero) {
-      val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
-      val useLightIcons = ColorUtils.calculateLuminance(palette.hero.toArgb()) <= 0.5
-      // Bars are transparent (set by WindowCompat.enableEdgeToEdge in MainActivity); the hero Box
-      // draws edge-to-edge behind them. Only icon tint is adjusted here.
-      val insetsController = WindowCompat.getInsetsController(window, view)
-      insetsController.isAppearanceLightStatusBars = !useLightIcons
-      insetsController.isAppearanceLightNavigationBars = !useLightIcons
+    // DisposableEffect instead of LaunchedEffect: the onDispose block restores the app-wide theme
+    // default (from RootContent) when the user navigates back to the list screen. Without this
+    // restore, the counter's last hero-tint would leak onto the list/edit bars because RootContent's
+    // LaunchedEffect is keyed on isDark and does not re-fire when isDark is unchanged.
+    DisposableEffect(palette.hero, isDark) {
+      val window = (view.context as? Activity)?.window
+      if (window != null) {
+        // Bars are transparent (WindowCompat.enableEdgeToEdge in MainActivity); the hero Box draws
+        // edge-to-edge behind them. Icon tint follows the hero luminance while this screen is shown.
+        val useLightIcons = ColorUtils.calculateLuminance(palette.hero.toArgb()) <= 0.5
+        val insetsController = WindowCompat.getInsetsController(window, view)
+        insetsController.isAppearanceLightStatusBars = !useLightIcons
+        insetsController.isAppearanceLightNavigationBars = !useLightIcons
+      }
+      onDispose {
+        // Restore the app-wide theme default so list/edit screens keep legible bar icons.
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+          val insetsController = WindowCompat.getInsetsController(window, view)
+          insetsController.isAppearanceLightStatusBars = !isDark
+          insetsController.isAppearanceLightNavigationBars = !isDark
+        }
+      }
     }
   }
 
@@ -411,16 +423,30 @@ private fun PastCounter(
   val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHighest
 
   // Edge-to-edge: past screen uses neutral surface color, not the event palette hero.
+  val isDark = LocalResolvedDarkTheme.current
   val view = LocalView.current
   if (!view.isInEditMode) {
-    LaunchedEffect(surfaceColor) {
-      val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
-      val useLightIcons = ColorUtils.calculateLuminance(surfaceColor.toArgb()) <= 0.5
-      // Bars are transparent (set by WindowCompat.enableEdgeToEdge in MainActivity); the surface Box
-      // draws edge-to-edge behind them. Only icon tint is adjusted here.
-      val insetsController = WindowCompat.getInsetsController(window, view)
-      insetsController.isAppearanceLightStatusBars = !useLightIcons
-      insetsController.isAppearanceLightNavigationBars = !useLightIcons
+    // DisposableEffect: onDispose restores the app-wide theme default (from RootContent) when the
+    // user navigates back. Without this, the surface-tint leaks onto the list/edit bars.
+    DisposableEffect(surfaceColor, isDark) {
+      val window = (view.context as? Activity)?.window
+      if (window != null) {
+        // Bars are transparent (WindowCompat.enableEdgeToEdge in MainActivity); the surface Box
+        // draws edge-to-edge behind them. Icon tint follows surface luminance while this screen is shown.
+        val useLightIcons = ColorUtils.calculateLuminance(surfaceColor.toArgb()) <= 0.5
+        val insetsController = WindowCompat.getInsetsController(window, view)
+        insetsController.isAppearanceLightStatusBars = !useLightIcons
+        insetsController.isAppearanceLightNavigationBars = !useLightIcons
+      }
+      onDispose {
+        // Restore the app-wide theme default so list/edit screens keep legible bar icons.
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+          val insetsController = WindowCompat.getInsetsController(window, view)
+          insetsController.isAppearanceLightStatusBars = !isDark
+          insetsController.isAppearanceLightNavigationBars = !isDark
+        }
+      }
     }
   }
 
