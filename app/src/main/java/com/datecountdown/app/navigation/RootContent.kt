@@ -36,7 +36,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import com.datecountdown.app.core.design.theme.LocalResolvedDarkTheme
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -92,6 +95,24 @@ internal fun RootContent(
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
+
+  // --- App-wide bar-icon appearance ----------------------------------------------------------
+  // WindowCompat.enableEdgeToEdge (MainActivity) makes bars transparent but does not manage icon
+  // appearance. This effect provides the default for all screens (list, edit, initial counter
+  // frame). The counter screen overrides it per its hero/surface background while shown, and
+  // restores this default in onDispose when the user navigates back.
+  // LocalResolvedDarkTheme is the single source of truth — it respects the in-app ThemeMode
+  // LIGHT/DARK override, unlike isSystemInDarkTheme() which only reads the system setting.
+  val view = LocalView.current
+  val isDark = LocalResolvedDarkTheme.current
+  if (!view.isInEditMode) {
+    LaunchedEffect(isDark) {
+      val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
+      val controller = WindowCompat.getInsetsController(window, view)
+      controller.isAppearanceLightStatusBars = !isDark
+      controller.isAppearanceLightNavigationBars = !isDark
+    }
+  }
 
   // --- Permission state setup ----------------------------------------------------------------
 
