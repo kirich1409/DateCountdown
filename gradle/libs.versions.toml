@@ -21,7 +21,7 @@ room = "2.8.4"
 datastore = "1.2.1"
 kotlinxDatetime = "0.6.2"
 turbine = "1.2.1"
-robolectric = "4.14.1"
+robolectric = "4.16.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
