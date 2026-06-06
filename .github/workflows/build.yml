@@ -19,7 +19,7 @@ jobs:
           # the app still compiles to toolchain 17 via jvmToolchain(17).
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Build and lint
         run: ./gradlew assembleDebug lintDebug --no-daemon
